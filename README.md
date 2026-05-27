@@ -9,7 +9,8 @@ This is the **backend API** for the **Local Service Finder platform** – a comp
 ✅ **JWT-based Authentication** – Secure access with token-based sessions.  
 ✅ **Multi-Channel Verification** – Link-based email confirmation and Africa's Talking SMS OTP.  
 ✅ **Hierarchical Role Access** – Granular permissions for Customers, Providers, Admins, and Super Admins.  
-✅ **Automated Trust Signals** – Automatic "Verified" status (Blue Tick) upon successful phone verification.  
+✅ **Manual Identity Verification** – High-trust verification pipeline involving government-issued ID review (NIN, BVN, Passport).  
+✅ **Identity Lifecycle Management** – Users progress through `unverified`, `pending`, `verified`, and `rejected` states.  
 ✅ **Service Management** – Smart pricing models (Fixed / Negotiable / Visit Required).  
 ✅ **Admin Dashboard Suite** – Approve provider applications, manage user status, and elevate administrators.  
 ✅ **Global Error Handling** – Consistent API responses and validation.  
@@ -52,10 +53,25 @@ app/
 ```bash
 git clone https://github.com/your-repo/local-service-backend.git
 cd local-service-backend
+
+# Create and activate virtual environment
+python -m venv venv
+.\venv\Scripts\activate  # Windows
+source venv/bin/activate  # Unix/macOS
+
+# Install dependencies
 pip install -r requirements.txt
 ```
 
-### 2. Configure Environment (`.env`)
+### 2. Database Migration
+
+Before running the app, initialize your database tables:
+
+```bash
+alembic upgrade head
+```
+
+### 3. Configure Environment (`.env`)
 
 Create a `.env` file in the root directory:
 
@@ -92,20 +108,23 @@ uvicorn app.main:app --reload
 
 ---
 
-## 🔐 Verification Flow
+## 🔐 Identity Verification Flow
 
-The platform operates on a high-trust model:
-1. **Email Verification**: A confirmation link is sent upon registration.
-2. **Phone Verification**: A 6-digit OTP is sent via SMS.
-3. **Verification Badge**: The "Identity Verified" blue tick is automatically granted once a user confirms their phone number.
+The platform operates on a high-trust, multi-layered verification model:
+1. **ID Submission**: Users upload government-issued ID details (Type, Number) and photo URLs for review.
+2. **Pending Review**: Accounts are marked as `pending` once identity documents are submitted.
+3. **Admin Audit**: Administrators manually review the provided ID photos via the Admin Dashboard.
+4. **Verification Badge**: The "Identity Verified" blue tick is granted only after manual admin approval.
+5. **Rejection Handling**: Admins can reject invalid IDs, allowing users to re-submit corrected information.
 
 ---
 
 ## 🧑‍💼 Admin & Super Admin Actions
 
 ### Admin Capabilities:
-- **User Management**: View all users and deactivate accounts.
-- **Provider Oversight**: Review and verify provider applications.
+- **Identity Audit**: Review, approve, or reject user-submitted identity documents.
+- **User Management**: View all users, filter by identity status, and deactivate accounts.
+- **Provider Oversight**: Review and verify provider applications and service listings.
 - **Payment Release**: Manually release payments to providers after service completion.
 
 ### Super Admin Exclusive:
@@ -126,4 +145,4 @@ Ready to launch your local service empire 🚀
 
 ---
 
-🗓️ **Last Updated:** May 01, 2025
+🗓️ **Last Updated:** May 27, 2026
