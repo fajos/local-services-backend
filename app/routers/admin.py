@@ -2,6 +2,7 @@
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from app.models.user import User
 from app.models.provider import Provider
 from app.models.booking import Booking
@@ -30,12 +31,14 @@ def admin_login(
     form_data: OAuth2PasswordRequestForm = Depends(),
     db: Session = Depends(get_db)
 ):
-    user = db.query(User).filter(User.email == form_data.username).first()
+    # Case-insensitive search for the user
+    user = db.query(User).filter(func.lower(User.email) == func.lower(form_data.username)).first()
 
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
-    if not user.is_active:
+    # Handle NULL is_active by treating it as True (Active)
+    if user.is_active is False:
         raise HTTPException(status_code=403, detail="Account is deactivated.")
 
     if not user.is_admin:
@@ -46,6 +49,7 @@ def admin_login(
         "first_name": user.first_name,
         "last_name": user.last_name,
         "email": user.email,
+        "role": "admin",
         "is_provider": user.is_provider,
         "is_admin": user.is_admin,
         "is_super_admin": user.is_super_admin,
