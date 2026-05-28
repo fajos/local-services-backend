@@ -6,7 +6,7 @@ from app.models.user import User
 from app.models.provider import Provider
 from app.models.booking import Booking
 from app.schemas.booking import BookingOutExtended
-from app.schemas.user import UserOut
+from app.schemas.user import UserOut, UserOutExtended
 from app.schemas.provider import ProviderOut
 from app.dependencies import get_current_admin, get_db, get_current_super_admin
 from typing import List
@@ -117,7 +117,7 @@ def list_paid_bookings_not_released(
 
     return enriched          # <- ALWAYS return this list
 
-@router.get("/users", response_model=List[UserOut])
+@router.get("/users", response_model=List[UserOutExtended])
 def list_all_users(
     db: Session = Depends(get_db),
     admin_user = Depends(get_current_admin)

@@ -47,6 +47,7 @@ class UserOut(BaseModel):
     is_email_confirmed: bool | None = False
     is_phone_confirmed: bool | None = False
     is_provider: bool | None = False
+    is_active: bool | None = True
     created_at: datetime
 
     class Config:
