@@ -39,7 +39,10 @@ def admin_login(
 
     # Handle NULL is_active by treating it as True (Active)
     if user.is_active is False:
-        raise HTTPException(status_code=403, detail="Account is deactivated.")
+        raise HTTPException(
+            status_code=403,
+            detail="Your account has been deactivated. Please contact the administrator for assistance."
+        )
 
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="You are not authorized as admin.")
@@ -342,6 +345,36 @@ def deactivate_provider(
         raise HTTPException(status_code=404, detail="Provider not found.")
 
     provider.verified = False  # deactivate by setting verified to False
+    db.commit()
+    db.refresh(provider)
+    return provider
+
+@router.patch("/users/{user_id}/activate", response_model=UserOut)
+def activate_user(
+    user_id: str,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    user.is_active = True
+    db.commit()
+    db.refresh(user)
+    return user
+
+@router.patch("/providers/{provider_id}/activate", response_model=ProviderOut)
+def activate_provider(
+    provider_id: str,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found.")
+
+    provider.verified = True
     db.commit()
     db.refresh(provider)
     return provider

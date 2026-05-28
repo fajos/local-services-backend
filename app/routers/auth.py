@@ -46,6 +46,12 @@ def login(
             detail="Invalid credentials"
         )
 
+    if user.is_active is False:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Your account has been deactivated. Please contact the administrator for assistance."
+        )
+
     access_token = create_access_token(data={
         "sub": str(user.id),
         "first_name": user.first_name,
