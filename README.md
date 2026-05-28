@@ -11,6 +11,8 @@ This is the **backend API** for the **Local Service Finder platform** – a comp
 ✅ **Hierarchical Role Access** – Granular permissions for Customers, Providers, Admins, and Super Admins.  
 ✅ **Manual Identity Verification** – High-trust verification pipeline involving government-issued ID review (NIN, BVN, Passport).  
 ✅ **Identity Lifecycle Management** – Users progress through `unverified`, `pending`, `verified`, and `rejected` states.  
+✅ **Cloudinary Document Storage** – Seamless integration for secure storage of government ID photos.  
+✅ **Admin-Led Provisioning** – Administrators can directly create users and upgrade customers to providers.
 ✅ **Service Management** – Smart pricing models (Fixed / Negotiable / Visit Required).  
 ✅ **Admin Dashboard Suite** – Approve provider applications, manage user status, and elevate administrators.  
 ✅ **Global Error Handling** – Consistent API responses and validation.  
@@ -25,6 +27,7 @@ This is the **backend API** for the **Local Service Finder platform** – a comp
 - **PostgreSQL / SQLite** (Database)
 - **Pydantic V2** (Data validation)
 - **Africa's Talking** (SMS Gateway)
+- **Cloudinary** (Document & Image Storage)
 - **FastAPI Mail** (SMTP Integration)
 - **Alembic** (Migration Management)
 
@@ -93,6 +96,12 @@ MAIL_PASSWORD=your_app_password
 MAIL_FROM=your_email@gmail.com
 MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=465
+
+# Cloudinary (Identity Documents)
+CLOUDINARY_CLOUD_NAME=your_cloud_name
+CLOUDINARY_API_KEY=your_api_key
+CLOUDINARY_API_SECRET=your_api_secret
+CLOUDINARY_URL=cloudinary://your_key:your_secret@your_name
 ```
 
 ### 4. Run the App
@@ -133,6 +142,7 @@ The platform operates on a high-trust, multi-layered verification model:
 ## 🧑‍💼 Admin & Super Admin Actions
 
 ### Admin Capabilities:
+- **User Provisioning**: Directly create user accounts and upgrade existing customers to Provider status.
 - **Identity Audit**: Review, approve, or reject user-submitted identity documents.
 - **User Management**: View all users, filter by identity status, and deactivate accounts.
 - **Provider Oversight**: Review and verify provider applications and service listings.
@@ -156,4 +166,4 @@ Ready to launch your local service empire 🚀
 
 ---
 
-🗓️ **Last Updated:** May 27, 2026
+🗓️ **Last Updated:** May 22, 2024

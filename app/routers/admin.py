@@ -7,8 +7,8 @@ from app.models.user import User
 from app.models.provider import Provider
 from app.models.booking import Booking
 from app.schemas.booking import BookingOutExtended
-from app.schemas.user import UserOut, UserOutExtended
-from app.schemas.provider import ProviderOut
+from app.schemas.user import UserOut, UserOutExtended, UserCreate
+from app.schemas.provider import ProviderOut, ProviderCreate
 from app.dependencies import get_current_admin, get_db, get_current_super_admin
 from typing import List
 from fastapi.security import OAuth2PasswordRequestForm
@@ -364,6 +364,28 @@ def activate_user(
     db.refresh(user)
     return user
 
+@router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_user_permanently(
+    user_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_super_admin)
+):
+    """
+    Permanently delete a user from the database.
+    Only Super Admins can perform this action.
+    """
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    # Prevent self-deletion via this endpoint for safety
+    if str(user.id) == str(current_user.id):
+        raise HTTPException(status_code=400, detail="You cannot delete your own account.")
+
+    db.delete(user)
+    db.commit()
+    return None
+
 @router.patch("/providers/{provider_id}/activate", response_model=ProviderOut)
 def activate_provider(
     provider_id: str,
@@ -430,3 +452,61 @@ def admin_reset_user_password(
     user.password_hash = hash_password(payload.new_password)
     db.commit()
     return {"message": "Password reset successfully"}
+
+@router.post("/users", response_model=UserOut)
+def admin_create_user(
+    payload: UserCreate,
+    db: Session = Depends(get_db),
+    admin = Depends(get_current_admin)
+):
+    existing = db.query(User).filter(User.email == payload.email).first()
+    if existing:
+        raise HTTPException(status_code=400, detail="User with this email already exists.")
+
+    new_user = User(
+        first_name=payload.first_name,
+        last_name=payload.last_name,
+        email=payload.email,
+        phone=payload.phone,
+        address=payload.address,
+        password_hash=hash_password(payload.password),
+        is_email_confirmed=True, # Admin created users are pre-confirmed
+        is_phone_confirmed=True
+    )
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    return new_user
+
+@router.post("/users/{user_id}/make-provider", response_model=ProviderOut)
+def admin_make_provider(
+    user_id: str,
+    payload: ProviderCreate,
+    db: Session = Depends(get_db),
+    admin = Depends(get_current_admin)
+):
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found.")
+
+    if user.is_provider:
+        # Check if they already have a provider record
+        existing_p = db.query(Provider).filter(Provider.user_id == user.id).first()
+        if existing_p:
+             raise HTTPException(status_code=400, detail="User is already a provider.")
+
+    # Create provider record
+    new_provider = Provider(
+        user_id=user.id,
+        business_name=payload.business_name,
+        business_address=payload.business_address,
+        business_phone=payload.business_phone,
+        business_email=payload.business_email,
+        open_hours=payload.open_hours,
+        verified=True # Admin created providers are pre-verified
+    )
+    user.is_provider = True
+    db.add(new_provider)
+    db.commit()
+    db.refresh(new_provider)
+    return new_provider
