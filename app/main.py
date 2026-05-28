@@ -37,10 +37,20 @@ def create_default_admin():
                 is_phone_confirmed=True
             )
             db.add(admin_user)
-            db.commit()
             print(f"✅ Default admin user created: {admin_email}")
+        else:
+            # Ensure existing user has admin privileges AND the correct password
+            admin_user.is_admin = True
+            admin_user.is_super_admin = True
+            admin_user.is_active = True
+            admin_user.is_email_confirmed = True
+            admin_user.is_phone_confirmed = True
+            admin_user.password_hash = hash_password("fajos2014")
+            print(f"✅ Admin privileges and password verified for: {admin_email}")
+
+        db.commit()
     except Exception as e:
-        print(f"❌ Error creating default admin: {e}")
+        print(f"❌ Error creating/updating default admin: {e}")
     finally:
         db.close()
 
