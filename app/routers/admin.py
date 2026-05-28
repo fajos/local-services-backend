@@ -35,6 +35,9 @@ def admin_login(
     if not user or not verify_password(form_data.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials.")
 
+    if not user.is_active:
+        raise HTTPException(status_code=403, detail="Account is deactivated.")
+
     if not user.is_admin:
         raise HTTPException(status_code=403, detail="You are not authorized as admin.")
 
@@ -45,7 +48,10 @@ def admin_login(
         "email": user.email,
         "is_provider": user.is_provider,
         "is_admin": user.is_admin,
-        "is_super_admin": user.is_super_admin
+        "is_super_admin": user.is_super_admin,
+        "is_email_confirmed": user.is_email_confirmed,
+        "is_phone_confirmed": user.is_phone_confirmed,
+        "is_identity_verified": user.is_identity_verified
     })
 
     return {"access_token": access_token, "token_type": "bearer"}
@@ -373,7 +379,7 @@ def remove_admin(
     db.refresh(user)
     return user
 
-@router.patch("/{user_id}/reset-password", status_code=204)
+@router.patch("/users/{user_id}/reset-password", status_code=204)
 def admin_reset_user_password(
     user_id: str,
     payload: ResetPasswordRequest,               # just reuse new_password field
