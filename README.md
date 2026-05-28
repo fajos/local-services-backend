@@ -95,16 +95,27 @@ MAIL_SERVER=smtp.gmail.com
 MAIL_PORT=465
 ```
 
-### 3. Run the App
+### 4. Run the App
 
 ```bash
 uvicorn app.main:app --reload
 ```
 
-### 4. Access the Docs
+### 5. Access the Docs
 
 - **Swagger UI:** [http://localhost:8000/docs](http://localhost:8000/docs)  
 - **ReDoc:** [http://localhost:8000/redoc](http://localhost:8000/redoc)
+
+---
+
+## 🌐 Deployment (Render)
+
+When deploying to Render, use the following settings:
+
+- **Build Command:** `pip install -r requirements.txt`
+- **Start Command:** `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+
+> **Note:** The `$PORT` variable is automatically injected by Render. Ensure all required environment variables from the `.env` section are added in the Render **Environment** tab.
 
 ---
 
