@@ -11,6 +11,7 @@ from app.models.user import User
 from app.enums import BookingStatus, QuoteStatus, VisitStatus, PaymentStatus, PriceType
 from app.dependencies import get_db
 from app.dependencies import get_current_user, get_current_admin
+from app.utils.notifications import create_notification
 import uuid
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
@@ -58,6 +59,16 @@ def book_service(
     db.add(booking)
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        service.provider.user_id,
+        "New Booking Request 📩",
+        f"You have a new booking request for '{service.name}' from {current_user.first_name}.",
+        "info"
+    )
+
     return booking
 
 @router.get("/me", response_model=List[BookingCustomerOut])
@@ -185,6 +196,16 @@ def provider_mark_complete(
     booking.booking_status = BookingStatus.completed
     db.commit()
     db.refresh(booking)
+
+    # Notify Customer
+    create_notification(
+        db,
+        booking.customer_id,
+        "Service Completed 🏆",
+        f"'{booking.service.name}' has been marked as completed by the provider. Please leave a review!",
+        "success"
+    )
+
     return booking
 
 @router.patch("/{booking_id}/cancel", response_model=BookingCustomerOut)
@@ -207,6 +228,15 @@ def cancel_booking(
     booking.booking_status = BookingStatus.declined
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        booking.service.provider.user_id,
+        "Booking Cancelled 🚫",
+        f"{current_user.first_name} has cancelled their booking for '{booking.service.name}'.",
+        "warning"
+    )
 
     # Re-use the enrich logic (brevity):
     service   = booking.service
@@ -249,6 +279,16 @@ def send_quote(
     booking.quote_status = QuoteStatus.pending
     db.commit()
     db.refresh(booking)
+
+    # Notify Customer
+    create_notification(
+        db,
+        booking.customer_id,
+        "New Quote Received 💰",
+        f"You received a quote of ₦{quote_price:,} for '{booking.service.name}'. Check your dashboard to accept or decline.",
+        "info"
+    )
+
     return booking
 
 
@@ -280,6 +320,16 @@ def accept_quote(
     booking.quote_status = QuoteStatus.accepted
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        booking.service.provider.user_id,
+        "Quote Accepted ✅",
+        f"{current_user.first_name} accepted your quote for '{booking.service.name}'. You can now proceed with the service.",
+        "success"
+    )
+
     return booking
 
 @router.post("/{booking_id}/decline-quote", response_model=BookingOut)
@@ -310,6 +360,16 @@ def decline_quote(
     booking.quote_status = QuoteStatus.declined
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        booking.service.provider.user_id,
+        "Quote Declined ❌",
+        f"{current_user.first_name} declined your quote for '{booking.service.name}'.",
+        "danger"
+    )
+
     return booking
 
 @router.post("/{booking_id}/mark-paid", response_model=BookingOut)
@@ -340,6 +400,16 @@ def mark_booking_paid(
     booking.payment_status = PaymentStatus.paid
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        booking.service.provider.user_id,
+        "Payment Received 💵",
+        f"{current_user.first_name} has paid for '{booking.service.name}'. You can now see their contact details in your dashboard.",
+        "success"
+    )
+
     return booking
 
 # Provider ACCEPTS a booking (e.g., fixed-price job)
@@ -363,6 +433,16 @@ def provider_accept_booking(
     booking.booking_status = BookingStatus.accepted
     db.commit()
     db.refresh(booking)
+
+    # Notify Customer
+    create_notification(
+        db,
+        booking.customer_id,
+        "Booking Accepted ✅",
+        f"Your booking for '{booking.service.name}' has been accepted by the provider.",
+        "success"
+    )
+
     return booking
 
 
@@ -386,5 +466,14 @@ def provider_decline_booking(
     booking.booking_status = BookingStatus.declined
     db.commit()
     db.refresh(booking)
+
+    # Notify Provider
+    create_notification(
+        db,
+        booking.service.provider.user_id,
+        "Booking Cancelled 🚫",
+        f"{current_user.first_name} has cancelled their booking for '{booking.service.name}'.",
+        "warning"
+    )
     return booking
 

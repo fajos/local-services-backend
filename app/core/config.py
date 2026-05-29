@@ -23,8 +23,16 @@ class Settings(BaseSettings):
     mail_starttls: bool = False  
     mail_ssl_tls: bool = True  
 
-    at_username: str
-    at_api_key: str  
+    # ── Cloudinary settings ────────────────────────────────────
+    cloudinary_cloud_name: str
+    cloudinary_api_key: str
+    cloudinary_api_secret: str
+    cloudinary_upload_preset: str
+
+    # ── Payout / Payment settings ──────────────────────────────
+    PAYOUT_GATEWAY: str = "paystack"  # "stripe" or "paystack"
+    PAYSTACK_SECRET_KEY: str | None = None
+    STRIPE_SECRET_KEY: str | None = None
 
      # ── Pydantic V2 config ────────────────────────────────────
     model_config = SettingsConfigDict(

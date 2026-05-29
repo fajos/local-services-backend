@@ -11,7 +11,7 @@ async def send_email(subject: str, recipients: list[str], body: str):
     # Build the message
     msg = EmailMessage()
     msg["Subject"] = subject
-    msg["From"]    = settings.mail_from
+    msg["From"]    = f"Local Service Finder <{settings.mail_from}>"
     msg["To"]      = ", ".join(recipients)
     msg.set_content(body)
 

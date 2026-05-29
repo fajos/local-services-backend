@@ -1,13 +1,14 @@
-import os, httpx, stripe
+import httpx, stripe
 from typing import Literal
+from app.core.config import settings
 
-# Pick ONE gateway at runtime via env var
+# Pick ONE gateway at runtime via config
 GatewayType = Literal["stripe", "paystack"]
-GATEWAY: GatewayType = os.getenv("PAYOUT_GATEWAY", "stripe")
+GATEWAY: GatewayType = settings.PAYOUT_GATEWAY
 
 # ------------ Stripe Connect ------------
 if GATEWAY == "stripe":
-    stripe.api_key = os.getenv("STRIPE_SECRET_KEY")
+    stripe.api_key = settings.STRIPE_SECRET_KEY
 
     async def send_payout(
         amount_kobo: int,
@@ -15,11 +16,7 @@ if GATEWAY == "stripe":
         provider_stripe_account: str,
         reference: str,
     ):
-        """
-        amount_kobo -> 100₦ == 10000 kobo
-        currency    -> "ngn", "usd", …
-        provider_stripe_account -> Connect account ID (acct_***)
-        """
+        # ... (rest of the stripe logic)
         try:
             payout = stripe.Transfer.create(
                 amount     = amount_kobo,
@@ -33,7 +30,7 @@ if GATEWAY == "stripe":
 
 # ------------ Paystack -------------
 else:
-    PAYSTACK_SK   = os.getenv("PAYSTACK_SECRET_KEY")
+    PAYSTACK_SK   = settings.PAYSTACK_SECRET_KEY
     PAYSTACK_URL  = "https://api.paystack.co/transfer"
 
     async def send_payout(

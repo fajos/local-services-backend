@@ -12,7 +12,7 @@ class Provider(Base):
     __tablename__ = "providers"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), unique=True)
+    user_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), unique=True, nullable=False)
     business_name = Column(String, nullable=False)
     business_address = Column(String, nullable=False)
     business_phone = Column(String, nullable=False)
@@ -24,7 +24,7 @@ class Provider(Base):
     reviews_count   = Column(Integer, default=0)
 
     user = relationship("User", back_populates="provider")
-    services = relationship("Service", back_populates="provider")
+    services = relationship("Service", back_populates="provider", cascade="all, delete-orphan")
     stripe_account     = Column(String, nullable=True)   # acct_123...
     paystack_recipient = Column(String, nullable=True)   # RCP_xyz..
     reviews = relationship("Review", back_populates="provider", cascade="all, delete-orphan")

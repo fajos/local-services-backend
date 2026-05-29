@@ -23,7 +23,7 @@ class ProviderCreate(BaseModel):
 
 class ProviderOut(BaseModel):
     id: UUID
-    user_id: UUID
+    user_id: UUID | None = None
     business_name: str
     business_address: str
     business_phone: str

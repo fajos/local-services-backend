@@ -14,7 +14,7 @@ class Service(Base):
     __tablename__ = "services"
 
     id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id"))
+    provider_id = Column(UUID(as_uuid=True), ForeignKey("providers.id", ondelete="CASCADE"), nullable=False)
     name = Column(String, nullable=False)
     description = Column(Text, nullable=False)
     category = Column(String, nullable=False)
@@ -24,5 +24,5 @@ class Service(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     provider = relationship("Provider", back_populates="services")
-    bookings = relationship("Booking", back_populates="service")
+    bookings = relationship("Booking", back_populates="service", cascade="all, delete-orphan")
 

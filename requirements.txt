@@ -10,9 +10,7 @@ pydantic-settings
 python-dotenv
 alembic
 httpx
-africastalking
-fastapi-mail
-python-multipart
 emails
 python-slugify
 stripe
+paystack-python

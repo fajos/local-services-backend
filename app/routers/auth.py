@@ -16,7 +16,6 @@ from app.core.security import (
     create_confirmation_token, verify_confirmation_token,
     generate_otp
 )
-from app.utils.sms    import send_sms
 from datetime import datetime, timedelta
 from pydantic import BaseModel
 
@@ -117,15 +116,17 @@ def register(
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    # 1) ensure email or phone provided
-    if not (data.email or data.phone):
-        raise HTTPException(400, "You must provide email or phone.")
+    # 1) ensure email provided
+    if not data.email:
+        raise HTTPException(400, "Email is required for registration.")
 
     # 2) enforce uniqueness
-    if data.email and db.query(User).filter_by(email=data.email).first():
+    if db.query(User).filter_by(email=data.email).first():
         raise HTTPException(400, "Email already registered.")
+
+    # Phone uniqueness (still good to keep phone as a contact field)
     if data.phone and db.query(User).filter_by(phone=data.phone).first():
-        raise HTTPException(400, "Phone already registered.")
+        raise HTTPException(400, "Phone number already in use.")
 
     # 3) create user
     user = User(
@@ -135,42 +136,30 @@ def register(
         phone=data.phone,
         password_hash=hash_password(data.password),
         is_active=True,
-        address=data.address
+        address=data.address,
+        is_phone_confirmed=True # Auto-confirm phone since we aren't verifying it
     )
 
     db.add(user)
     db.commit()
     db.refresh(user)
 
-    # 4a) if email flow
-    if data.email:
-        token = create_confirmation_token(str(user.id))
-        link = f"{settings.FRONTEND_URL}/confirm-email?token={token}"
-        body = (
-            f"Hi {user.first_name},\n\n"
-            "Thank you for registering! Please confirm your email by clicking:\n"
-            f"{link}\n\nThis link expires in {CONFIRM_EXP_HOURS} hours."
-        )
-        background_tasks.add_task(
-            send_email,
-            "Confirm your email",
-            [data.email],
-            body,
-        )
-    # 4b) else SMS flow
-    else:
-        code = generate_otp()
-        user.phone_confirmation_code = code
-        user.phone_confirmation_expires_at = datetime.utcnow() + timedelta(minutes=10)
-        db.commit()
-        background_tasks.add_task(
-            send_sms,
-            user.phone,
-            f"Your confirmation code is {code}",
-        )
+    # 4) Email flow
+    token = create_confirmation_token(str(user.id))
+    link = f"{settings.FRONTEND_URL}/confirm-email?token={token}"
+    body = (
+        f"Hi {user.first_name},\n\n"
+        "Thank you for registering! Please confirm your email by clicking:\n"
+        f"{link}\n\nThis link expires in {CONFIRM_EXP_HOURS} hours."
+    )
+    background_tasks.add_task(
+        send_email,
+        "Confirm your email",
+        [data.email],
+        body,
+    )
 
-    method = "email" if data.email else "phone"
-    return RegisterResponse(user_id=str(user.id), confirmation=method)
+    return RegisterResponse(user_id=str(user.id), confirmation="email")
 
 @router.post("/confirm-email", status_code=204)
 def confirm_email(
@@ -192,18 +181,11 @@ def confirm_phone(
     payload: ConfirmPhoneRequest,
     db: Session = Depends(get_db),
 ):
+    # Phone is now auto-confirmed. We keep this as a no-op for backward compatibility.
     user = db.query(User).get(payload.user_id)
     if not user:
         raise HTTPException(404, "User not found.")
-    if (
-        user.phone_confirmation_code != payload.code
-        or user.phone_confirmation_expires_at < datetime.utcnow()
-    ):
-        raise HTTPException(400, "Invalid or expired code.")
     user.is_phone_confirmed = True
-    user.is_identity_verified = True  # Verified badge now linked to phone confirmation
-    user.phone_confirmation_code = None
-    user.phone_confirmation_expires_at = None
     db.commit()
 
 @router.post("/resend-email", status_code=204)
@@ -227,18 +209,7 @@ def resend_email(
 @router.post("/resend-phone", status_code=204)
 def resend_phone(
     payload: ResendPhoneRequest,
-    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
 ):
-    user = db.query(User).filter_by(phone=payload.phone).first()
-    if not user:
-        raise HTTPException(404, "Phone not registered.")
-    code = generate_otp()
-    user.phone_confirmation_code = code
-    user.phone_confirmation_expires_at = datetime.utcnow() + timedelta(minutes=10)
-    db.commit()
-    background_tasks.add_task(
-        send_sms,
-        payload.phone,
-        f"Your confirmation code is {code}",
-    )
+    # SMS is deprecated.
+    raise HTTPException(400, "SMS verification is no longer supported. Phone numbers are auto-confirmed.")

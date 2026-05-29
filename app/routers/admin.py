@@ -23,6 +23,7 @@ from uuid import uuid4
 from app.schemas.auth import ResetPasswordRequest
 
 from app.utils.mailer import send_email
+from app.utils.notifications import create_notification
 
 router = APIRouter(prefix="/admin", tags=["Admin"])
 
@@ -267,6 +268,15 @@ def verify_user_identity(
 
     user.is_identity_verified = True
     user.identity_status = "verified"
+
+    create_notification(
+        db,
+        user.id,
+        "Identity Verified ✅",
+        "Your government-issued ID has been successfully verified. You now have the verified badge!",
+        "success"
+    )
+
     db.commit()
     db.refresh(user)
     return user
@@ -283,6 +293,15 @@ def reject_user_identity(
 
     user.is_identity_verified = False
     user.identity_status = "rejected"
+
+    create_notification(
+        db,
+        user.id,
+        "Identity Verification Rejected ❌",
+        "Your identity document was not approved. Please check your details and upload a clear photo of a valid ID.",
+        "danger"
+    )
+
     db.commit()
     db.refresh(user)
     return user
@@ -299,6 +318,15 @@ def verify_provider(
         raise HTTPException(status_code=404, detail="Provider not found.")
 
     provider.verified = True
+
+    create_notification(
+        db,
+        provider.user_id,
+        "Provider Account Verified 🎊",
+        f"Your application for '{provider.business_name}' has been approved! You can now start listing services.",
+        "success"
+    )
+
     db.commit()
     db.refresh(provider)
 
@@ -345,6 +373,16 @@ def deactivate_provider(
         raise HTTPException(status_code=404, detail="Provider not found.")
 
     provider.verified = False  # deactivate by setting verified to False
+
+    if provider.user_id:
+        create_notification(
+            db,
+            provider.user_id,
+            "Provider Profile Deactivated ⚠️",
+            f"Your provider profile '{provider.business_name}' has been deactivated by an administrator. Your services will no longer be visible to customers.",
+            "warning"
+        )
+
     db.commit()
     db.refresh(provider)
     return provider
@@ -397,9 +435,52 @@ def activate_provider(
         raise HTTPException(status_code=404, detail="Provider not found.")
 
     provider.verified = True
+
+    create_notification(
+        db,
+        provider.user_id,
+        "Provider Account Verified 🎊",
+        f"Your application for '{provider.business_name}' has been approved! You can now start listing services.",
+        "success"
+    )
+
     db.commit()
     db.refresh(provider)
     return provider
+
+@router.delete("/providers/{provider_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_provider(
+    provider_id: str,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    """
+    Permanently delete a provider and reset the user's is_provider status.
+    """
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found.")
+
+    # Only update user and notify if the provider is linked to a user
+    if provider.user_id:
+        user = db.query(User).filter(User.id == provider.user_id).first()
+        if user:
+            user.is_provider = False
+
+        try:
+            create_notification(
+                db,
+                provider.user_id,
+                "Provider Status Removed",
+                f"Your provider profile '{provider.business_name}' has been deleted by an administrator.",
+                "warning"
+            )
+        except Exception as e:
+            print(f"Could not notify user {provider.user_id}: {e}")
+
+    db.delete(provider)
+    db.commit()
+    return None
 
 @router.patch("/users/{user_id}/make-admin", response_model=UserOut)
 def make_admin(

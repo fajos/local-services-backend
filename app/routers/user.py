@@ -14,30 +14,6 @@ from app.schemas.user import UserOutExtended, UserUpdate
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
-@router.post("/register", response_model=UserOut)
-def register_user(data: UserCreate, db: Session = Depends(get_db)):
-    existing = db.query(User).filter(User.email == data.email).first()
-    if existing:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Email already in use."
-        )
-    
-    user = User(
-        id=uuid.uuid4(),
-        first_name=data.first_name,
-        last_name=data.last_name,
-        email=data.email,
-        password_hash=hash_password(data.password),
-        phone=data.phone,
-        address=data.address,
-        is_provider=False
-    )
-    db.add(user)
-    db.commit()
-    db.refresh(user)
-    return user
-
 @router.post("/create-super-admin")
 def create_super_admin(db: Session = Depends(get_db)):
     from app.core.security import hash_password

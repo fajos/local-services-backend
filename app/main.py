@@ -6,7 +6,7 @@ from app.database import engine, Base, SessionLocal
 from app.models.user import User
 from app.core.security import hash_password
 from contextlib import asynccontextmanager
-from app.routers import auth, user, provider, service, booking, admin, review
+from app.routers import auth, user, provider, service, booking, admin, review, notification
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.exception_handlers import (
@@ -83,6 +83,7 @@ app.include_router(service.router)
 app.include_router(booking.router)
 app.include_router(admin.router)
 app.include_router(review.router)
+app.include_router(notification.router)
 
 # Register global handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)

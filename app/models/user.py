@@ -33,9 +33,13 @@ class User(Base):
     phone_confirmation_expires_at = Column(DateTime, nullable=True)
 
     # One-to-one with Provider (if upgraded)
-    provider = relationship("Provider", back_populates="user", uselist=False)
+    provider = relationship("Provider", back_populates="user", uselist=False, cascade="all, delete-orphan")
 
     # One-to-many relationship with Booking (as customer)
     bookings = relationship("Booking", back_populates="customer")
+
+    # One-to-many with Notifications
+    notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+
     is_admin = Column(Boolean, default=False)
     is_super_admin = Column(Boolean, default=False)

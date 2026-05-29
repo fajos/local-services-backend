@@ -10,10 +10,10 @@ class ResetPasswordRequest(BaseModel):
     new_password: str = Field(..., min_length=8)
 
 class RegisterRequest(BaseModel):
-    first_name: str
-    last_name:  str
+    first_name: str = Field(..., min_length=2, max_length=50)
+    last_name:  str = Field(..., min_length=2, max_length=50)
     email:      Optional[EmailStr] = None
-    phone:      Optional[str]       = None
+    phone:      Optional[str]       = Field(None, min_length=10, max_length=20)
     password:   str = Field(..., min_length=8)
     address:    str
 
