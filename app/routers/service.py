@@ -32,7 +32,7 @@ def create_service(
 
     if not provider.verified:
         raise HTTPException(status_code=403, detail="Your provider profile is not yet verified.")
-    
+
     service = Service(
         id=uuid.uuid4(),
         provider_id=provider.id,
@@ -47,8 +47,21 @@ def create_service(
     db.refresh(service)
     return service
 
-class ServiceWithRating(ServiceOut):
-    average_rating: float | None = None
+@router.get("/", response_model=List[ServiceOut])
+def list_all_services(
+    db: Session = Depends(get_db),
+):
+    """Public: list all active & verified services."""
+    services = (
+        db.query(Service)
+        .join(Provider, Service.provider_id == Provider.id)
+        .filter(
+            Service.is_active == True,
+            Provider.verified == True,
+        )
+        .all()
+    )
+    return services
 
 @router.get("/me", response_model=list[ServiceOut])
 def get_my_services(
@@ -140,53 +153,3 @@ def get_service_details_public(
             },
         },
     }
-
-@router.patch("/{service_id}", status_code=204)
-def update_service(
-    service_id: str,
-    body: ServiceUpdate,
-    db: Session = Depends(get_db),
-    current_user = Depends(get_current_user),
-):
-    svc = db.query(Service).filter(Service.id == service_id).first()
-    if not svc:
-        raise HTTPException(404, "Service not found")
-
-    # only owner may edit
-    if svc.provider.user_id != current_user.id:
-        raise HTTPException(403, "Not your service")
-
-    update_data = body.dict(exclude_unset=True)
-    if "price_type" in update_data and update_data["price_type"] != "Fixed":
-        update_data["price"] = None  # clear price for non‑fixed types
-
-    for field, value in update_data.items():
-        setattr(svc, field, value)
-
-    db.commit()
-    return  # 204 No Content
-
-
-@router.delete("/{service_id}", status_code=status.HTTP_204_NO_CONTENT)
-def deactivate_service(
-    service_id: str,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    provider = db.query(Provider).filter(Provider.user_id == current_user.id).first()
-    if not provider:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Provider profile not found."
-        )
-
-    service = db.query(Service).filter(Service.id == service_id, Service.provider_id == provider.id).first()
-    if not service:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Service not found."
-        )
-
-    service.is_active = False
-    db.commit()
-    return

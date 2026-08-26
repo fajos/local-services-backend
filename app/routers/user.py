@@ -40,6 +40,7 @@ def create_super_admin(db: Session = Depends(get_db)):
 
 
 @router.get("/me", response_model=UserOutExtended)
+@router.get("/me/", response_model=UserOutExtended, include_in_schema=False)
 def get_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
