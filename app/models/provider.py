@@ -21,6 +21,8 @@ class Provider(Base):
     image_url = Column(String, nullable=True)
     open_hours = Column(String, nullable=True)
     verified = Column(Boolean, default=False)
+    is_online = Column(Boolean, default=True)
+    service_radius = Column(Integer, default=10)  # in kilometers
     created_at = Column(DateTime, default=datetime.utcnow)
     average_rating  = Column(Integer, nullable=True)  # store as *hundredths* e.g. 453 = 4.53
     reviews_count   = Column(Integer, default=0)

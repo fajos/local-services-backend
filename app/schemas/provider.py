@@ -35,6 +35,8 @@ class ProviderOut(BaseModel):
     image_url: str | None = None
     open_hours: str | None = None
     verified: bool
+    is_online: bool = True
+    service_radius: int = 10
     created_at: datetime
     portfolio: list[PortfolioItemOut] = []
 
@@ -49,3 +51,6 @@ class ProviderUpdate(BaseModel):
     business_description: str | None = None
     image_url:        str | None = None
     open_hours:       str | None = None
+    is_online:        bool | None = None
+    service_radius:   int | None = None
+

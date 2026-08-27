@@ -6,7 +6,7 @@ from app.database import engine, Base, SessionLocal
 from app.models.user import User
 from app.core.security import hash_password
 from contextlib import asynccontextmanager
-from app.routers import auth, user, provider, service, booking, admin, review, notification
+from app.routers import auth, user, provider, service, booking, admin, review, notification, chat
 from fastapi.exceptions import RequestValidationError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 from app.core.exception_handlers import (
@@ -102,6 +102,7 @@ app.include_router(booking.router)
 app.include_router(admin.router)
 app.include_router(review.router)
 app.include_router(notification.router)
+app.include_router(chat.router)
 
 # Register global handlers
 app.add_exception_handler(RequestValidationError, validation_exception_handler)
@@ -111,3 +112,7 @@ app.add_exception_handler(Exception, server_error_handler)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to the Local Service Finder API!"}
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "message": "Server is alive and kicking!"}

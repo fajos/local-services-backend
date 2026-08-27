@@ -10,10 +10,13 @@ class PriceType(str, Enum):
 
 
 class BookingStatus(str, Enum):
-    pending = "Pending"
-    accepted = "Accepted"
-    declined = "Declined"
-    completed = "Completed"
+    pending = "pending"
+    accepted = "accepted"
+    declined = "declined"
+    in_progress = "in-progress"
+    completed = "completed"
+    paid = "paid"
+    cancelled = "cancelled"
 
 
 class QuoteStatus(str, Enum):

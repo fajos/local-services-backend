@@ -177,6 +177,37 @@ def get_bookings_for_provider(
 
     return result                      # ← ALWAYS a list
 
+@router.post("/{booking_id}/mark-in-progress", response_model=BookingOut)
+def provider_mark_in_progress(
+    booking_id: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    if booking.service.provider.user_id != current_user.id:
+        raise HTTPException(403, "Not your booking")
+
+    if booking.booking_status != BookingStatus.accepted:
+        raise HTTPException(400, "Booking must be accepted before starting")
+
+    booking.booking_status = BookingStatus.in_progress
+    db.commit()
+    db.refresh(booking)
+
+    # Notify Customer
+    create_notification(
+        db,
+        booking.customer_id,
+        "Job Started 🚀",
+        f"The provider has started working on '{booking.service.name}'.",
+        "info"
+    )
+
+    return booking
+
 @router.post("/{booking_id}/mark-complete", response_model=BookingOut)
 def provider_mark_complete(
     booking_id: str,
@@ -467,13 +498,13 @@ def provider_decline_booking(
     db.commit()
     db.refresh(booking)
 
-    # Notify Provider
+    # Notify Customer
     create_notification(
         db,
-        booking.service.provider.user_id,
-        "Booking Cancelled 🚫",
-        f"{current_user.first_name} has cancelled their booking for '{booking.service.name}'.",
-        "warning"
+        booking.customer_id,
+        "Booking Declined ❌",
+        f"The provider has declined your booking request for '{booking.service.name}'.",
+        "danger"
     )
     return booking
 
