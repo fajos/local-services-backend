@@ -563,6 +563,7 @@ def admin_create_user(
 def admin_make_provider(
     user_id: str,
     payload: ProviderCreate,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     admin = Depends(get_current_admin)
 ):
@@ -583,11 +584,38 @@ def admin_make_provider(
         business_address=payload.business_address,
         business_phone=payload.business_phone,
         business_email=payload.business_email,
+        business_description=payload.business_description,
+        image_url=payload.image_url,
         open_hours=payload.open_hours,
         verified=True # Admin created providers are pre-verified
     )
     user.is_provider = True
     db.add(new_provider)
+
+    create_notification(
+        db,
+        user.id,
+        "Provider Status Granted! 🎊",
+        f"An administrator has granted you provider status for '{payload.business_name}'. You can now log in to your dashboard and start listing services.",
+        "success"
+    )
+
     db.commit()
     db.refresh(new_provider)
+
+    # Send Approval Email
+    if user.email:
+        body = (
+            f"Hi {user.first_name},\n\n"
+            f"Great news! An administrator has granted you provider status for your business '{payload.business_name}'.\n"
+            "You can now create services, manage bookings, and start receiving requests from customers.\n\n"
+            "Log in to your dashboard to get started!"
+        )
+        background_tasks.add_task(
+            send_email,
+            "Provider Status Granted! 🎉",
+            [user.email],
+            body
+        )
+
     return new_provider
