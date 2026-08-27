@@ -20,18 +20,67 @@ from sqlalchemy import text
 Base.metadata.create_all(bind=engine)
 
 def fix_missing_columns():
-    """Manually add columns if they are missing (Common issue on Render deployments)"""
+    """Manually add columns and tables if they are missing (Common issue on Render deployments)"""
     db = SessionLocal()
     try:
+        # Columns for 'users'
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url VARCHAR"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_type VARCHAR"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_number VARCHAR"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_photo_url VARCHAR"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS identity_status VARCHAR DEFAULT 'unverified'"))
+
+        # Columns for 'providers'
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS business_email VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS business_description VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS open_hours VARCHAR"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS service_radius INTEGER DEFAULT 10"))
+
+        # Ensure Enum values exist in PostgreSQL (BookingStatus)
+        try:
+            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'in-progress'"))
+            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'paid'"))
+            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'cancelled'"))
+        except Exception:
+            pass # Type might not exist yet if tables haven't been created
+
+        # Tables for Chat and Notifications (Base.metadata.create_all handles creation, but just in case)
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS chat_messages (
+                id UUID PRIMARY KEY,
+                booking_id UUID NOT NULL REFERENCES bookings(id) ON DELETE CASCADE,
+                sender_id UUID NOT NULL REFERENCES users(id),
+                message TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS notifications (
+                id UUID PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                title VARCHAR NOT NULL,
+                message VARCHAR NOT NULL,
+                type VARCHAR DEFAULT 'info',
+                is_read BOOLEAN DEFAULT FALSE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS portfolio_items (
+                id UUID PRIMARY KEY,
+                provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
+                title VARCHAR,
+                image_url VARCHAR NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+
         db.commit()
-        print("✅ Database columns verified/updated.")
+        print("✅ Database columns and tables verified/updated.")
     except Exception as e:
-        print(f"⚠️ Column fix skipped: {e}")
+        print(f"⚠️ Column fix skipped or failed: {e}")
     finally:
         db.close()
 
