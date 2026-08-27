@@ -14,9 +14,23 @@ from app.core.exception_handlers import (
     http_exception_handler,
     server_error_handler,
 )
+from sqlalchemy import text
 
 # Create database tables
 Base.metadata.create_all(bind=engine)
+
+def fix_missing_columns():
+    """Manually add columns if they are missing (Common issue on Render deployments)"""
+    db = SessionLocal()
+    try:
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url VARCHAR"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
+        db.commit()
+        print("✅ Database columns verified/updated.")
+    except Exception as e:
+        print(f"⚠️ Column fix skipped: {e}")
+    finally:
+        db.close()
 
 def create_default_admin():
     db = SessionLocal()
@@ -56,6 +70,7 @@ def create_default_admin():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    fix_missing_columns()
     create_default_admin()
     yield
 
