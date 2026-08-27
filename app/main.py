@@ -25,6 +25,8 @@ def fix_missing_columns():
     try:
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS profile_photo_url VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS business_email VARCHAR"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS open_hours VARCHAR"))
         db.commit()
         print("✅ Database columns verified/updated.")
     except Exception as e:

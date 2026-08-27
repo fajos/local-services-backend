@@ -1,9 +1,11 @@
 # app/routers/provider.py
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 from app.schemas.provider import ProviderCreate, ProviderOut, ProviderUpdate
 from app.models.provider import Provider
+from app.models.portfolio import PortfolioItem
+from app.schemas.portfolio import PortfolioItemCreate, PortfolioItemOut
 from app.models.user import User
 from app.dependencies import get_db
 from app.dependencies import get_current_user
@@ -49,6 +51,7 @@ def get_my_provider(
 ):
     provider = (
         db.query(Provider)
+        .options(joinedload(Provider.portfolio))
         .filter(Provider.user_id == current_user.id)
         .first()
     )
@@ -81,3 +84,84 @@ def update_my_provider(
     db.commit()
     db.refresh(provider)
     return provider
+
+
+@router.get("/{provider_id}", response_model=ProviderOut)
+def get_provider_by_id(provider_id: uuid.UUID, db: Session = Depends(get_db)):
+    # Try looking up by Provider ID first
+    provider = db.query(Provider).options(joinedload(Provider.portfolio)).filter(Provider.id == provider_id).first()
+    if not provider:
+        # Fallback: Try looking up by User ID
+        provider = db.query(Provider).options(joinedload(Provider.portfolio)).filter(Provider.user_id == provider_id).first()
+
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found")
+    return provider
+
+
+@router.get("/user/{user_id}", response_model=ProviderOut)
+def get_provider_by_user_id(user_id: uuid.UUID, db: Session = Depends(get_db)):
+    provider = db.query(Provider).filter(Provider.user_id == user_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found for this user")
+    return provider
+
+
+# --- Portfolio Endpoints ---
+
+@router.get("/{provider_id}/portfolio", response_model=list[PortfolioItemOut])
+def get_provider_portfolio(provider_id: uuid.UUID, db: Session = Depends(get_db)):
+    return db.query(PortfolioItem).filter(PortfolioItem.provider_id == provider_id).all()
+
+
+@router.get("/me/portfolio", response_model=list[PortfolioItemOut])
+def get_my_portfolio(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.provider:
+        raise HTTPException(status_code=400, detail="Not a provider")
+    return db.query(PortfolioItem).filter(PortfolioItem.provider_id == current_user.provider.id).all()
+
+
+@router.post("/me/portfolio", response_model=PortfolioItemOut)
+def add_to_portfolio(
+    data: PortfolioItemCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.provider:
+        raise HTTPException(status_code=400, detail="Not a provider")
+
+    item = PortfolioItem(
+        id=uuid.uuid4(),
+        provider_id=current_user.provider.id,
+        title=data.title,
+        image_url=data.image_url
+    )
+    db.add(item)
+    db.commit()
+    db.refresh(item)
+    return item
+
+
+@router.delete("/me/portfolio/{item_id}", status_code=204)
+def remove_from_portfolio(
+    item_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    if not current_user.provider:
+        raise HTTPException(status_code=400, detail="Not a provider")
+
+    item = db.query(PortfolioItem).filter(
+        PortfolioItem.id == item_id,
+        PortfolioItem.provider_id == current_user.provider.id
+    ).first()
+
+    if not item:
+        raise HTTPException(status_code=404, detail="Portfolio item not found")
+
+    db.delete(item)
+    db.commit()
+    return None

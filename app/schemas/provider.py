@@ -3,6 +3,7 @@
 from pydantic import BaseModel, EmailStr, Field
 from uuid import UUID
 from datetime import datetime
+from app.schemas.portfolio import PortfolioItemOut
 
 
 # -----------------------------------
@@ -33,6 +34,7 @@ class ProviderOut(BaseModel):
     open_hours: str | None = None
     verified: bool
     created_at: datetime
+    portfolio: list[PortfolioItemOut] = []
 
     class Config:
         from_attributes = True

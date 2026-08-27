@@ -26,6 +26,7 @@ class Provider(Base):
 
     user = relationship("User", back_populates="provider")
     services = relationship("Service", back_populates="provider", cascade="all, delete-orphan")
+    portfolio = relationship("PortfolioItem", back_populates="provider", cascade="all, delete-orphan")
     stripe_account     = Column(String, nullable=True)   # acct_123...
     paystack_recipient = Column(String, nullable=True)   # RCP_xyz..
     reviews = relationship("Review", back_populates="provider", cascade="all, delete-orphan")
