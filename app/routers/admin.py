@@ -20,7 +20,7 @@ from app.core.payment import send_payout, GATEWAY
 from app.database import SessionLocal
 from decimal import Decimal
 from uuid import uuid4
-from app.schemas.auth import ResetPasswordRequest
+from app.schemas.auth import ResetPasswordRequest, AdminResetPasswordRequest
 
 from app.utils.mailer import send_email
 from app.utils.notifications import create_notification
@@ -357,7 +357,16 @@ def deactivate_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found.")
 
-    user.is_active = False  # (You need to add is_active field to User model if you want this soft ban feature)
+    user.is_active = False
+
+    create_notification(
+        db,
+        user.id,
+        "Account Deactivated ⚠️",
+        "Your account has been deactivated by an administrator. Please contact support for more information.",
+        "danger"
+    )
+
     db.commit()
     db.refresh(user)
     return user
@@ -398,6 +407,15 @@ def activate_user(
         raise HTTPException(status_code=404, detail="User not found.")
 
     user.is_active = True
+
+    create_notification(
+        db,
+        user.id,
+        "Account Reactivated ✅",
+        "Your account has been successfully reactivated. Welcome back!",
+        "success"
+    )
+
     db.commit()
     db.refresh(user)
     return user
@@ -522,7 +540,7 @@ def remove_admin(
 @router.patch("/users/{user_id}/reset-password", status_code=204)
 def admin_reset_user_password(
     user_id: str,
-    payload: ResetPasswordRequest,               # just reuse new_password field
+    payload: AdminResetPasswordRequest,
     db: Session = Depends(get_db),
     admin = Depends(get_current_admin),
 ):
@@ -531,6 +549,15 @@ def admin_reset_user_password(
         raise HTTPException(status.HTTP_404_NOT_FOUND, "User not found")
 
     user.password_hash = hash_password(payload.new_password)
+
+    create_notification(
+        db,
+        user.id,
+        "Password Reset by Admin 🔐",
+        "An administrator has reset your password. If you didn't request this, please contact support immediately.",
+        "warning"
+    )
+
     db.commit()
     return {"message": "Password reset successfully"}
 

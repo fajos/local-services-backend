@@ -9,6 +9,9 @@ class ResetPasswordRequest(BaseModel):
     token: str
     new_password: str = Field(..., min_length=8)
 
+class AdminResetPasswordRequest(BaseModel):
+    new_password: str = Field(..., min_length=8)
+
 class RegisterRequest(BaseModel):
     first_name: str = Field(..., min_length=2, max_length=50)
     last_name:  str = Field(..., min_length=2, max_length=50)

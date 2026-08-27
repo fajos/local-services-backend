@@ -83,7 +83,10 @@ def update_my_profile(
             current_user.identity_status = "pending"
 
     for field, value in data.items():
-        setattr(current_user, field, value)
+        if field == "password":
+            current_user.password_hash = hash_password(value)
+        else:
+            setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
     return current_user
