@@ -15,6 +15,7 @@ class ProviderCreate(BaseModel):
     business_address: str
     business_phone: str = Field(..., min_length=10, max_length=20)
     business_email: EmailStr | None = None
+    business_description: str | None = None
     image_url: str | None = None
     open_hours: str | None = None
 
@@ -30,6 +31,7 @@ class ProviderOut(BaseModel):
     business_address: str
     business_phone: str
     business_email: EmailStr | None = None
+    business_description: str | None = None
     image_url: str | None = None
     open_hours: str | None = None
     verified: bool
@@ -43,5 +45,7 @@ class ProviderUpdate(BaseModel):
     business_name:    str | None = None
     business_address: str | None = None
     business_phone:   str | None = None
+    business_email:   str | None = None
+    business_description: str | None = None
     image_url:        str | None = None
     open_hours:       str | None = None

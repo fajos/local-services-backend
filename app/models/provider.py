@@ -17,6 +17,7 @@ class Provider(Base):
     business_address = Column(String, nullable=False)
     business_phone = Column(String, nullable=False)
     business_email = Column(String, nullable=True)
+    business_description = Column(String, nullable=True)
     image_url = Column(String, nullable=True)
     open_hours = Column(String, nullable=True)
     verified = Column(Boolean, default=False)
