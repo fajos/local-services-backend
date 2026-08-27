@@ -4,9 +4,10 @@ import smtplib
 from email.message import EmailMessage
 from app.core.config import settings
 
-async def send_email(subject: str, recipients: list[str], body: str):
+def send_email(subject: str, recipients: list[str], body: str):
     """
-    Sends a plain-text email via SMTP. Falls back cleanly on errors.
+    Sends a plain-text email via SMTP using synchronous smtplib.
+    FastAPI BackgroundTasks will handle running this in a thread.
     """
     # Build the message
     msg = EmailMessage()
@@ -25,7 +26,7 @@ async def send_email(subject: str, recipients: list[str], body: str):
                 settings.mail_server,
                 settings.mail_port,
                 context=ctx,
-                timeout=10,
+                timeout=20, # Increased timeout
             ) as server:
                 server.login(settings.mail_username, settings.mail_password)
                 server.send_message(msg)
@@ -34,13 +35,13 @@ async def send_email(subject: str, recipients: list[str], body: str):
             with smtplib.SMTP(
                 settings.mail_server,
                 settings.mail_port,
-                timeout=10,
+                timeout=20, # Increased timeout
             ) as server:
                 server.ehlo()
                 server.starttls(context=ctx)
                 server.ehlo()
                 server.login(settings.mail_username, settings.mail_password)
                 server.send_message(msg)
+        print(f"✅ Email sent successfully to {recipients}")
     except Exception as e:
-        # In production you’d log this; for now, just print
-        print("❌ SMTP send failed:", e)
+        print(f"❌ SMTP send failed to {recipients}: {e}")
