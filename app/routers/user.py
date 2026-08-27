@@ -58,6 +58,7 @@ def get_my_profile(
         "id_type": current_user.id_type,
         "id_number": current_user.id_number,
         "id_photo_url": current_user.id_photo_url,
+        "profile_photo_url": current_user.profile_photo_url,
         "is_email_confirmed": current_user.is_email_confirmed,
         "is_phone_confirmed": current_user.is_phone_confirmed,
         "is_provider": current_user.is_provider,

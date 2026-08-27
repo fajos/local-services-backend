@@ -23,6 +23,7 @@ class User(Base):
     id_type = Column(String(50), nullable=True) # e.g. NIN, Driver's License
     id_number = Column(String(100), nullable=True)
     id_photo_url = Column(String, nullable=True)
+    profile_photo_url = Column(String, nullable=True)
     identity_status = Column(String(20), default="unverified") # unverified, pending, verified, rejected
     is_provider = Column(Boolean, default=False)
     is_active = Column(Boolean, default=True)

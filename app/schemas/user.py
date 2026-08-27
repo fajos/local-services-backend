@@ -44,6 +44,7 @@ class UserOut(BaseModel):
     id_type: str | None = None
     id_number: str | None = None
     id_photo_url: str | None = None
+    profile_photo_url: str | None = None
     is_email_confirmed: bool | None = False
     is_phone_confirmed: bool | None = False
     is_provider: bool | None = False
@@ -61,6 +62,7 @@ class UserUpdate(BaseModel):
     id_type:    str | None = None
     id_number:  str | None = None
     id_photo_url: str | None = None
+    profile_photo_url: str | None = None
 
 class UserOutExtended(UserOut):
     is_admin: bool | None = False
