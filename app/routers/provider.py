@@ -33,6 +33,7 @@ def setup_provider(
         business_address=data.business_address,
         business_phone=data.business_phone,
         business_email=data.business_email,
+        business_description=data.business_description,
         image_url=data.image_url,
         open_hours=data.open_hours
     )

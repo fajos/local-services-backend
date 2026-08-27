@@ -68,3 +68,4 @@ class UserOutExtended(UserOut):
     is_admin: bool | None = False
     is_super_admin: bool | None = False
     is_verified_provider: Optional[bool] = False
+    provider_id: Optional[UUID] = None

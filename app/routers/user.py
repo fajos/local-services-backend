@@ -65,7 +65,8 @@ def get_my_profile(
         "created_at": current_user.created_at,
         "is_admin": current_user.is_admin,
         "is_super_admin": current_user.is_super_admin,
-        "is_verified_provider": provider.verified if provider else False
+        "is_verified_provider": provider.verified if provider else False,
+        "provider_id": provider.id if provider else None
     }
 
 @router.put("/me", response_model=UserOut)
