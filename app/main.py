@@ -29,6 +29,7 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_number VARCHAR"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_photo_url VARCHAR"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS identity_status VARCHAR DEFAULT 'unverified'"))
+        db.commit()
 
         # Columns for 'providers'
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS image_url VARCHAR"))
@@ -37,14 +38,21 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS open_hours VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS service_radius INTEGER DEFAULT 10"))
+        db.commit()
 
         # Ensure Enum values exist in PostgreSQL (BookingStatus)
+        # Note: ALTER TYPE ... ADD VALUE cannot run in a transaction with other commands in some PG environments.
+        # We use a separate raw connection with AUTOCOMMIT for this.
         try:
-            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'in-progress'"))
-            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'paid'"))
-            db.execute(text("ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS 'cancelled'"))
-        except Exception:
-            pass # Type might not exist yet if tables haven't been created
+            with engine.connect() as conn:
+                with conn.execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
+                    for value in ['in-progress', 'paid', 'cancelled']:
+                        try:
+                            autocommit_conn.execute(text(f"ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS '{value}'"))
+                        except Exception as e:
+                            print(f"ℹ️ Enum value '{value}' exists or error: {e}")
+        except Exception as e:
+            print(f"⚠️ Enum update skipped: {e}")
 
         # Tables for Chat and Notifications (Base.metadata.create_all handles creation, but just in case)
         db.execute(text("""
