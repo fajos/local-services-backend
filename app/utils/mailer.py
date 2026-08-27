@@ -25,6 +25,7 @@ async def send_email(subject: str, recipients: list[str], body: str):
                 settings.mail_server,
                 settings.mail_port,
                 context=ctx,
+                timeout=10,
             ) as server:
                 server.login(settings.mail_username, settings.mail_password)
                 server.send_message(msg)
@@ -33,6 +34,7 @@ async def send_email(subject: str, recipients: list[str], body: str):
             with smtplib.SMTP(
                 settings.mail_server,
                 settings.mail_port,
+                timeout=10,
             ) as server:
                 server.ehlo()
                 server.starttls(context=ctx)
