@@ -13,15 +13,13 @@ class Settings(BaseSettings):
      # ── Frontend host (for reset links) ────────────────────────
     FRONTEND_URL: str
 
-     # ── Email (SMTP) settings ─────────────────────────────────
-    mail_username: str
-    mail_password: str
+     # ── Email (Brevo HTTP API) settings ───────────────────────
+    brevo_api_key: str
     mail_from: EmailStr
-    mail_server: str
-    mail_port: int = 465
-
-    mail_starttls: bool = False  
-    mail_ssl_tls: bool = True  
+    # mail_server: str
+    # mail_port: int = 465
+    # mail_starttls: bool = False
+    # mail_ssl_tls: bool = True
 
     # ── Cloudinary settings ────────────────────────────────────
     cloudinary_cloud_name: str

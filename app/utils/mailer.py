@@ -1,41 +1,38 @@
 # app/utils/mailer.py
-import emails
+import httpx
 from app.core.config import settings
 
 def send_email(subject: str, recipients: list[str], body: str):
     """
-    Sends an email using the 'emails' library.
-    Works perfectly with Brevo SMTP relay.
+    Sends an email using Brevo's REST API v3.
+    This bypasses SMTP port blocks on cloud platforms like Render.
     """
+    url = "https://api.brevo.com/v3/smtp/email"
+
+    headers = {
+        "accept": "application/json",
+        "content-type": "application/json",
+        "api-key": settings.brevo_api_key
+    }
+
+    payload = {
+        "sender": {"name": "Local Service Finder", "email": settings.mail_from},
+        "to": [{"email": r} for r in recipients],
+        "subject": subject,
+        "htmlContent": f"<p>{body.replace('\n', '<br>')}</p>",
+        "textContent": body
+    }
+
     try:
-        print(f"📧 Sending email to {recipients} via {settings.mail_server}:{settings.mail_port}...")
+        print(f"📧 Sending email to {recipients} via Brevo HTTP API...")
 
-        # Create the email message
-        message = emails.html(
-            subject=subject,
-            html=f"<p>{body.replace('\n', '<br>')}</p>",
-            text=body,
-            mail_from=("Local Service Finder", settings.mail_from)
-        )
+        with httpx.Client() as client:
+            response = client.post(url, headers=headers, json=payload, timeout=20.0)
 
-        # SMTP configuration
-        smtp_params = {
-            "host": settings.mail_server,
-            "port": settings.mail_port,
-            "user": settings.mail_username,
-            "password": settings.mail_password,
-            "tls": settings.mail_starttls,
-            "ssl": settings.mail_ssl_tls,
-            "timeout": 20
-        }
-
-        # Send the email
-        response = message.send(to=recipients, smtp=smtp_params)
-
-        if response.status_code == 250:
+        if response.status_code in [201, 200, 202]:
             print(f"✅ Email sent successfully to {recipients}")
         else:
-            print(f"❌ SMTP Error: Status {response.status_code} - {response.error}")
+            print(f"❌ Brevo API Error: {response.status_code} - {response.text}")
 
     except Exception as e:
         print(f"❌ Failed to send email to {recipients}: {e}")
