@@ -81,31 +81,36 @@ def forgot_password(
 
     text_body = (
         f"Hello {user.first_name},\n\n"
-        "You requested a password reset. Click the link below to set a new password:\n\n"
+        "We received a request to reset the password for your Local Service Finder account. "
+        "If you made this request, please click the link below to set a new password:\n\n"
         f"{reset_link}\n\n"
-        "This link expires in 1 hour.\n"
-        "If you didn’t request this, you can ignore this email."
+        "For your security, this link will expire in 1 hour. If you did not request a password reset, "
+        "no further action is required and you can safely ignore this email.\n\n"
+        "Best regards,\n"
+        "The Local Service Finder Team"
     )
 
     html_body = (
-        "<div style='font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;'>"
-        f"<h2 style='color: #1e3a8a;'>Hello {user.first_name},</h2>"
-        "<p style='color: #475569;'>You requested a password reset. Click the button below to set a new password:</p>"
-        "<div style='text-align: center; margin: 30px 0;'>"
-        f"<a href='{reset_link}' style='display:inline-block;background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;'>Reset Password</a>"
+        "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #edf2f7; border-radius: 16px; background-color: #ffffff;'>"
+        f"<h2 style='color: #1a365d; margin-top: 0;'>Password Reset Request</h2>"
+        f"<p style='color: #4a5568; font-size: 16px; line-height: 1.6;'>Hello {user.first_name},</p>"
+        "<p style='color: #4a5568; font-size: 16px; line-height: 1.6;'>We received a request to reset the password for your Local Service Finder account. Click the secure button below to choose a new password:</p>"
+        "<div style='text-align: center; margin: 35px 0;'>"
+        f"<a href='{reset_link}' style='display:inline-block; background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);'>Reset My Password</a>"
         "</div>"
-        f"<p style='font-size: 12px; color: #64748b;'>Or copy this link into your browser:<br>{reset_link}</p>"
-        "<hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;'>"
-        "<p style='font-size: 11px; color: #94a3b8; text-align: center;'>"
-        "Local Service Finder • 123 Business St, Lagos, Nigeria<br>"
-        "If you didn’t request this, please ignore this email."
+        "<p style='color: #718096; font-size: 14px;'>If the button above doesn't work, copy and paste this link into your browser:</p>"
+        f"<p style='color: #2563eb; font-size: 13px; word-break: break-all;'>{reset_link}</p>"
+        "<hr style='border: 0; border-top: 1px solid #edf2f7; margin: 30px 0;'>"
+        "<p style='font-size: 12px; color: #a0aec0; text-align: center; line-height: 1.5;'>"
+        "This is an automated security notification. Please do not reply to this email.<br>"
+        "&copy; 2026 Local Service Finder. Lagos, Nigeria."
         "</p>"
         "</div>"
     )
 
     background_tasks.add_task(
         send_email,
-        subject="Your password reset link",
+        subject="Action Required: Reset your Local Service Finder password",
         recipients=[user.email],
         text_body=text_body,
         html_body=html_body
@@ -168,29 +173,36 @@ def register(
 
     text_body = (
         f"Hi {user.first_name},\n\n"
-        "Thank you for registering! Please confirm your email by clicking the link below:\n\n"
-        f"{link}\n\nThis link expires in {CONFIRM_EXP_HOURS} hours."
+        "Welcome to Local Service Finder! We're excited to have you on board. "
+        "To start booking services or listing your business, please verify your email address by clicking the link below:\n\n"
+        f"{link}\n\n"
+        f"This verification link will expire in {CONFIRM_EXP_HOURS} hours. "
+        "Verifying your email ensures you receive important booking updates and secure access to your account.\n\n"
+        "Thank you,\n"
+        "The Local Service Finder Team"
     )
 
     html_body = (
-        "<div style='font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;'>"
-        f"<h2 style='color: #1e3a8a;'>Hi {user.first_name},</h2>"
-        "<p style='color: #475569;'>Thank you for registering at Local Service Finder! Please confirm your email by clicking the button below:</p>"
-        "<div style='text-align: center; margin: 30px 0;'>"
-        f"<a href='{link}' style='display:inline-block;background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;'>Confirm Email</a>"
+        "<div style='font-family: Arial, sans-serif; max-width: 600px; margin: auto; padding: 30px; border: 1px solid #edf2f7; border-radius: 16px; background-color: #ffffff;'>"
+        f"<h2 style='color: #1a365d; margin-top: 0;'>Welcome to Local Service Finder!</h2>"
+        f"<p style='color: #4a5568; font-size: 16px; line-height: 1.6;'>Hi {user.first_name},</p>"
+        "<p style='color: #4a5568; font-size: 16px; line-height: 1.6;'>Thank you for joining our community! To get started with booking services and exploring top-rated local pros, please verify your email address:</p>"
+        "<div style='text-align: center; margin: 35px 0;'>"
+        f"<a href='{link}' style='display:inline-block; background-color: #2563eb; color: #ffffff; padding: 16px 32px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 16px; box-shadow: 0 4px 6px rgba(37, 99, 235, 0.2);'>Verify My Email Address</a>"
         "</div>"
-        f"<p style='font-size: 12px; color: #64748b;'>Or copy this link into your browser:<br>{link}</p>"
-        "<hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;'>"
-        "<p style='font-size: 11px; color: #94a3b8; text-align: center;'>"
-        "Local Service Finder • 123 Business St, Lagos, Nigeria<br>"
-        "You received this because you signed up for an account."
+        "<p style='color: #718096; font-size: 14px;'>Or copy and paste this link into your browser:</p>"
+        f"<p style='color: #2563eb; font-size: 13px; word-break: break-all;'>{link}</p>"
+        "<hr style='border: 0; border-top: 1px solid #edf2f7; margin: 30px 0;'>"
+        "<p style='font-size: 12px; color: #a0aec0; text-align: center; line-height: 1.5;'>"
+        "You received this email because you created an account on Local Service Finder.<br>"
+        "&copy; 2026 Local Service Finder. Lagos, Nigeria."
         "</p>"
         "</div>"
     )
 
     background_tasks.add_task(
         send_email,
-        "Confirm your email",
+        "Action Required: Verify your Local Service Finder account",
         [data.email],
         text_body,
         html_body
