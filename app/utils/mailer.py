@@ -2,10 +2,9 @@
 import httpx
 from app.core.config import settings
 
-def send_email(subject: str, recipients: list[str], body: str):
+def send_email(subject: str, recipients: list[str], text_body: str, html_body: str = None):
     """
     Sends an email using Brevo's REST API v3.
-    This bypasses SMTP port blocks on cloud platforms like Render.
     """
     url = "https://api.brevo.com/v3/smtp/email"
 
@@ -15,12 +14,15 @@ def send_email(subject: str, recipients: list[str], body: str):
         "api-key": settings.brevo_api_key
     }
 
+    # Use provided html_body or fall back to text_body with line breaks
+    final_html = html_body if html_body else f"<p>{text_body.replace('\n', '<br>')}</p>"
+
     payload = {
         "sender": {"name": "Local Service Finder", "email": settings.mail_from},
         "to": [{"email": r} for r in recipients],
         "subject": subject,
-        "htmlContent": f"<p>{body.replace('\n', '<br>')}</p>",
-        "textContent": body
+        "htmlContent": final_html,
+        "textContent": text_body
     }
 
     try:

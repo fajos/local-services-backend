@@ -78,7 +78,8 @@ def forgot_password(
 
     token = create_reset_token(str(user.id))
     reset_link = f"{settings.FRONTEND_URL}/reset-password?token={token}"
-    body = (
+
+    text_body = (
         f"Hello {user.first_name},\n\n"
         "You requested a password reset. Click the link below to set a new password:\n\n"
         f"{reset_link}\n\n"
@@ -86,11 +87,28 @@ def forgot_password(
         "If you didn’t request this, you can ignore this email."
     )
 
+    html_body = (
+        "<div style='font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;'>"
+        f"<h2 style='color: #1e3a8a;'>Hello {user.first_name},</h2>"
+        "<p style='color: #475569;'>You requested a password reset. Click the button below to set a new password:</p>"
+        "<div style='text-align: center; margin: 30px 0;'>"
+        f"<a href='{reset_link}' style='display:inline-block;background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;'>Reset Password</a>"
+        "</div>"
+        f"<p style='font-size: 12px; color: #64748b;'>Or copy this link into your browser:<br>{reset_link}</p>"
+        "<hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;'>"
+        "<p style='font-size: 11px; color: #94a3b8; text-align: center;'>"
+        "Local Service Finder • 123 Business St, Lagos, Nigeria<br>"
+        "If you didn’t request this, please ignore this email."
+        "</p>"
+        "</div>"
+    )
+
     background_tasks.add_task(
         send_email,
         subject="Your password reset link",
         recipients=[user.email],
-        body=body,
+        text_body=text_body,
+        html_body=html_body
     )
 
 @router.post("/reset-password", status_code=204)
@@ -147,16 +165,35 @@ def register(
     # 4) Email flow
     token = create_confirmation_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/confirm-email?token={token}"
-    body = (
+
+    text_body = (
         f"Hi {user.first_name},\n\n"
-        "Thank you for registering! Please confirm your email by clicking:\n"
+        "Thank you for registering! Please confirm your email by clicking the link below:\n\n"
         f"{link}\n\nThis link expires in {CONFIRM_EXP_HOURS} hours."
     )
+
+    html_body = (
+        "<div style='font-family: sans-serif; max-width: 600px; margin: auto; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px;'>"
+        f"<h2 style='color: #1e3a8a;'>Hi {user.first_name},</h2>"
+        "<p style='color: #475569;'>Thank you for registering at Local Service Finder! Please confirm your email by clicking the button below:</p>"
+        "<div style='text-align: center; margin: 30px 0;'>"
+        f"<a href='{link}' style='display:inline-block;background:#2563eb;color:white;padding:14px 28px;text-decoration:none;border-radius:8px;font-weight:bold;'>Confirm Email</a>"
+        "</div>"
+        f"<p style='font-size: 12px; color: #64748b;'>Or copy this link into your browser:<br>{link}</p>"
+        "<hr style='border: 0; border-top: 1px solid #e2e8f0; margin: 20px 0;'>"
+        "<p style='font-size: 11px; color: #94a3b8; text-align: center;'>"
+        "Local Service Finder • 123 Business St, Lagos, Nigeria<br>"
+        "You received this because you signed up for an account."
+        "</p>"
+        "</div>"
+    )
+
     background_tasks.add_task(
         send_email,
         "Confirm your email",
         [data.email],
-        body,
+        text_body,
+        html_body
     )
 
     return RegisterResponse(user_id=str(user.id), confirmation="email")
@@ -197,13 +234,24 @@ def resend_email(
     user = db.query(User).filter_by(email=payload.email).first()
     if not user:
         raise HTTPException(404, "Email not registered.")
+
     token = create_confirmation_token(str(user.id))
     link = f"{settings.FRONTEND_URL}/confirm-email?token={token}"
+
+    text_body = f"Please confirm your email by clicking: {link}"
+    html_body = (
+        f"<h2>Confirm Your Email</h2>"
+        "<p>Please click the button below to verify your email address:</p>"
+        f"<a href='{link}' style='display:inline-block;background:#2563eb;color:white;padding:12px 24px;text-decoration:none;border-radius:8px;font-weight:bold;'>Verify Email</a>"
+        f"<p>Or copy this link:<br>{link}</p>"
+    )
+
     background_tasks.add_task(
         send_email,
         "Confirm your email",
         [payload.email],
-        f"Please confirm: {link}",
+        text_body,
+        html_body
     )
 
 @router.post("/resend-phone", status_code=204)
