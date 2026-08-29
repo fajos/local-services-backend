@@ -11,6 +11,9 @@ class BookingCreate(BaseModel):
     note: str | None = None
     city_or_lga: str = Field(..., min_length=2, max_length=120) 
     visit_required: bool = False
+    scheduled_at: Optional[datetime] = None
+    latitude: Optional[str] = None
+    longitude: Optional[str] = None
 
 
 class BookingOut(BaseModel):
@@ -26,6 +29,14 @@ class BookingOut(BaseModel):
     payment_status: PaymentStatus
     created_at: datetime
     city_or_lga: str | None = None  
+
+    scheduled_at: datetime | None = None
+    latitude: str | None = None
+    longitude: str | None = None
+
+    is_disputed: bool = False
+    dispute_reason: str | None = None
+    dispute_status: str | None = None
 
     class Config:
         from_attributes = True

@@ -603,6 +603,29 @@ def propose_reschedule(
     )
 
     return booking
+
+@router.post("/{booking_id}/dispute", response_model=BookingOut)
+def report_booking_dispute(
+    booking_id: uuid.UUID,
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    if booking.customer_id != current_user.id:
+        raise HTTPException(403, "Only the customer can report an issue")
+
+    booking.is_disputed = True
+    booking.dispute_reason = payload.get("reason")
+    booking.dispute_status = "pending"
+
+    db.commit()
+    db.refresh(booking)
+
+    return booking
 @router.post("/{booking_id}/decline-booking", response_model=BookingOut)
 def provider_decline_booking(
     booking_id: str,

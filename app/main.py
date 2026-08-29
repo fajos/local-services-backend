@@ -48,6 +48,12 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_proposed_at TIMESTAMP"))
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_reason TEXT"))
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_by UUID"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMP"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS latitude VARCHAR(50)"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS longitude VARCHAR(50)"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_disputed BOOLEAN DEFAULT FALSE"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispute_reason TEXT"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispute_status VARCHAR(50)"))
         db.commit()
 
         # Columns for 'reviews'

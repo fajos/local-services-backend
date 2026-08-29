@@ -76,13 +76,68 @@ def get_admin_summary(
         Booking.payment_status == "paid",
         Booking.admin_released == False
     ).count()
+    total_disputes = db.query(Booking).filter(Booking.is_disputed == True, Booking.dispute_status == "pending").count()
 
     return {
         "total_users": total_users,
         "total_providers": total_providers,
         "unverified_providers": unverified_providers,
-        "pending_payouts": pending_payouts
+        "pending_payouts": pending_payouts,
+        "total_disputes": total_disputes
     }
+
+@router.get("/disputes", response_model=List[BookingOutExtended])
+def list_pending_disputes(
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    rows = (
+        db.query(Booking)
+        .filter(Booking.is_disputed == True, Booking.dispute_status == "pending")
+        .all()
+    )
+
+    enriched = []
+    for b in rows:
+        enriched.append({
+            "id": b.id,
+            "service_id": b.service_id,
+            "customer_id": b.customer_id,
+            "note": b.note,
+            "booking_status": b.booking_status,
+            "quote_price": b.quote_price,
+            "quote_status": b.quote_status,
+            "visit_required": b.visit_required,
+            "visit_status": b.visit_status,
+            "payment_status": b.payment_status,
+            "created_at": b.created_at,
+            "admin_released": b.admin_released,
+            "service_name": b.service.name,
+            "service_category": b.service.category,
+            "customer_name": f"{b.customer.first_name} {b.customer.last_name}",
+            "provider_name": b.service.provider.business_name,
+            "dispute_reason": b.dispute_reason,
+            "dispute_status": b.dispute_status
+        })
+    return enriched
+
+@router.post("/bookings/{booking_id}/resolve-dispute")
+def resolve_booking_dispute(
+    booking_id: str,
+    action: str, # "resolved" or "refunded"
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    booking.dispute_status = action
+    if action == "refunded":
+        booking.payment_status = PaymentStatus.refunded
+
+    db.commit()
+    return {"message": f"Dispute {action}"}
 
 @router.get("/bookings/paid", response_model=List[BookingOutExtended])
 def list_paid_bookings_not_released(

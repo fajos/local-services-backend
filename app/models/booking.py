@@ -29,6 +29,15 @@ class Booking(Base):
 
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.unpaid)
 
+    # Batch 2: Scheduling, Location & Disputes
+    scheduled_at = Column(DateTime, nullable=True)
+    latitude     = Column(String(50), nullable=True)
+    longitude    = Column(String(50), nullable=True)
+
+    is_disputed    = Column(Boolean, default=False)
+    dispute_reason = Column(Text, nullable=True)
+    dispute_status = Column(String(50), nullable=True) # pending, resolved, refunded
+
     # Rescheduling
     reschedule_proposed_at = Column(DateTime, nullable=True)
     reschedule_reason      = Column(Text, nullable=True)
