@@ -37,6 +37,10 @@ class ProviderOut(BaseModel):
     verified: bool
     is_online: bool = True
     service_radius: int = 10
+
+    background_checked: bool = False
+    verification_tier: str = "standard"
+
     created_at: datetime
     portfolio: list[PortfolioItemOut] = []
 

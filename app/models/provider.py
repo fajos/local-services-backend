@@ -27,6 +27,10 @@ class Provider(Base):
     average_rating  = Column(Integer, nullable=True)  # store as *hundredths* e.g. 453 = 4.53
     reviews_count   = Column(Integer, default=0)
 
+    # Trust & Safety
+    background_checked = Column(Boolean, default=False)
+    verification_tier  = Column(String, default="standard") # standard, silver, gold, etc.
+
     user = relationship("User", back_populates="provider")
     services = relationship("Service", back_populates="provider", cascade="all, delete-orphan")
     portfolio = relationship("PortfolioItem", back_populates="provider", cascade="all, delete-orphan")

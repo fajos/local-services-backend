@@ -17,6 +17,7 @@ class BookingStatus(str, Enum):
     completed = "completed"
     paid = "paid"
     cancelled = "cancelled"
+    rescheduled = "rescheduled"
 
 
 class QuoteStatus(str, Enum):

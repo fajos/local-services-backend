@@ -347,6 +347,34 @@ def verify_provider(
 
     return provider
 
+@router.patch("/providers/{provider_id}/toggle-background-check", response_model=ProviderOut)
+def toggle_provider_background_check(
+    provider_id: str,
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(status_code=404, detail="Provider not found.")
+
+    provider.background_checked = not provider.background_checked
+    if provider.background_checked:
+        provider.verification_tier = "silver" # Automatically bump tier
+    else:
+        provider.verification_tier = "standard"
+
+    create_notification(
+        db,
+        provider.user_id,
+        "Profile Badge Updated 🛡️",
+        f"Your account has been marked as 'Background Checked'. This will be visible on your profile.",
+        "success" if provider.background_checked else "info"
+    )
+
+    db.commit()
+    db.refresh(provider)
+    return provider
+
 @router.patch("/users/{user_id}/deactivate", response_model=UserOut)
 def deactivate_user(
     user_id: str,

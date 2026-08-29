@@ -44,3 +44,7 @@ class User(Base):
 
     is_admin = Column(Boolean, default=False)
     is_super_admin = Column(Boolean, default=False)
+
+    # Reputation
+    average_customer_rating = Column(Integer, nullable=True) # store as hundredths
+    customer_reviews_count  = Column(Integer, default=0)

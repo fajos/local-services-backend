@@ -46,3 +46,7 @@ class BookingCustomerOut(BookingOut):
     service_name: str
     service_category: str       # NEW
     provider_name: str
+
+class RescheduleRequest(BaseModel):
+    new_date: datetime
+    reason: str | None = None

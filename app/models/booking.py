@@ -28,6 +28,12 @@ class Booking(Base):
     visit_status = Column(Enum(VisitStatus), default=VisitStatus.not_started)
 
     payment_status = Column(Enum(PaymentStatus), default=PaymentStatus.unpaid)
+
+    # Rescheduling
+    reschedule_proposed_at = Column(DateTime, nullable=True)
+    reschedule_reason      = Column(Text, nullable=True)
+    reschedule_by          = Column(UUID(as_uuid=True), nullable=True) # ID of user who proposed
+
     created_at = Column(DateTime, default=datetime.utcnow)
 
     service = relationship("Service", back_populates="bookings")

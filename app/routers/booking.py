@@ -1,18 +1,20 @@
-# app/routers/booking.py
-
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from typing import List
-from app.schemas.booking import BookingCreate, BookingOut, BookingCustomerOut, BookingOutExtended
+from app.schemas.booking import BookingCreate, BookingOut, BookingCustomerOut, BookingOutExtended, RescheduleRequest
 from app.models.booking import Booking
 from app.models.service import Service
 from app.models.provider import Provider
 from app.models.user import User
+from app.models.review import Review, CustomerReview
+from app.schemas.review import ReviewCreate, ReviewOut, CustomerReviewCreate, CustomerReviewOut
 from app.enums import BookingStatus, QuoteStatus, VisitStatus, PaymentStatus, PriceType
 from app.dependencies import get_db
 from app.dependencies import get_current_user, get_current_admin
 from app.utils.notifications import create_notification
 import uuid
+from datetime import datetime
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -476,8 +478,131 @@ def provider_accept_booking(
 
     return booking
 
+@router.post("/{booking_id}/review", response_model=ReviewOut, status_code=201)
+def add_booking_review(
+    booking_id: uuid.UUID,
+    data: ReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    """Alias for adding a review via booking ID (Mobile compat)"""
+    booking = db.query(Booking).filter(
+        Booking.id == booking_id,
+        Booking.customer_id == current_user.id,
+        Booking.booking_status == BookingStatus.completed,
+        Booking.payment_status == PaymentStatus.paid
+    ).first()
 
-# Provider DECLINES a booking
+    if not booking:
+        raise HTTPException(400, "Booking not eligible for review")
+
+    if db.query(Review).filter(Review.booking_id == booking.id).first():
+        raise HTTPException(400, "Already reviewed")
+
+    review = Review(
+        booking_id=booking.id,
+        provider_id=booking.service.provider_id,
+        customer_id=current_user.id,
+        rating=data.rating,
+        comment=data.comment
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+
+    # Update provider average
+    prov = booking.service.provider
+    avg = db.query(func.avg(Review.rating)).filter(Review.provider_id == prov.id).scalar() or 0
+    prov.average_rating = int(round(avg * 100))
+    prov.reviews_count += 1
+    db.commit()
+
+    return {
+        **review.__dict__,
+        "customer_name": f"{current_user.first_name} {current_user.last_name}",
+        "service_name": booking.service.name
+    }
+
+@router.post("/{booking_id}/rate-customer", response_model=CustomerReviewOut, status_code=201)
+def rate_customer(
+    booking_id: uuid.UUID,
+    data: CustomerReviewCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    if booking.service.provider.user_id != current_user.id:
+        raise HTTPException(403, "Not authorized to rate this customer")
+
+    if booking.booking_status != BookingStatus.completed:
+        raise HTTPException(400, "Can only rate customer after completion")
+
+    if db.query(CustomerReview).filter(CustomerReview.booking_id == booking.id).first():
+        raise HTTPException(400, "Already rated this customer for this booking")
+
+    review = CustomerReview(
+        booking_id=booking.id,
+        provider_id=booking.service.provider_id,
+        customer_id=booking.customer_id,
+        rating=data.rating,
+        comment=data.comment
+    )
+    db.add(review)
+    db.commit()
+    db.refresh(review)
+
+    # Update customer average rating
+    customer = booking.customer
+    avg = db.query(func.avg(CustomerReview.rating)).filter(CustomerReview.customer_id == customer.id).scalar() or 0
+    customer.average_customer_rating = int(round(avg * 100))
+    customer.customer_reviews_count += 1
+    db.commit()
+
+    return {
+        **review.__dict__,
+        "provider_name": booking.service.provider.business_name
+    }
+
+@router.patch("/{booking_id}/reschedule", response_model=BookingOut)
+def propose_reschedule(
+    booking_id: uuid.UUID,
+    payload: RescheduleRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    # Both customer and provider can propose
+    is_customer = booking.customer_id == current_user.id
+    is_provider = booking.service.provider.user_id == current_user.id
+
+    if not (is_customer or is_provider):
+        raise HTTPException(403, "Not authorized")
+
+    booking.reschedule_proposed_at = payload.new_date
+    booking.reschedule_reason = payload.reason
+    booking.reschedule_by = current_user.id
+    booking.booking_status = BookingStatus.rescheduled
+
+    db.commit()
+    db.refresh(booking)
+
+    # Notify other party
+    other_party_id = booking.service.provider.user_id if is_customer else booking.customer_id
+    create_notification(
+        db,
+        other_party_id,
+        "Reschedule Proposed 🕒",
+        f"{current_user.first_name} proposed a new time for '{booking.service.name}': {payload.new_date.strftime('%Y-%m-%d %H:%M')}.",
+        "warning"
+    )
+
+    return booking
 @router.post("/{booking_id}/decline-booking", response_model=BookingOut)
 def provider_decline_booking(
     booking_id: str,
