@@ -77,14 +77,23 @@ def get_admin_summary(
         Booking.admin_released == False
     ).count()
     total_disputes = db.query(Booking).filter(Booking.is_disputed == True, Booking.dispute_status == "pending").count()
+    pending_identities = db.query(User).filter(User.identity_status == "pending").count()
 
     return {
         "total_users": total_users,
         "total_providers": total_providers,
         "unverified_providers": unverified_providers,
         "pending_payouts": pending_payouts,
-        "total_disputes": total_disputes
+        "total_disputes": total_disputes,
+        "pending_identities": pending_identities
     }
+
+@router.get("/users/pending-identity", response_model=List[UserOutExtended])
+def list_pending_identities(
+    db: Session = Depends(get_db),
+    admin_user = Depends(get_current_admin)
+):
+    return db.query(User).filter(User.identity_status == "pending").all()
 
 @router.get("/disputes", response_model=List[BookingOutExtended])
 def list_pending_disputes(
