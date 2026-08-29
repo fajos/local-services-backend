@@ -54,6 +54,9 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_disputed BOOLEAN DEFAULT FALSE"))
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispute_reason TEXT"))
         db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS dispute_status VARCHAR(50)"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS is_recurring BOOLEAN DEFAULT FALSE"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS frequency VARCHAR(20)"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS parent_booking_id UUID"))
         db.commit()
 
         # Columns for 'reviews'

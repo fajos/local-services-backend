@@ -38,6 +38,11 @@ class Booking(Base):
     dispute_reason = Column(Text, nullable=True)
     dispute_status = Column(String(50), nullable=True) # pending, resolved, refunded
 
+    # Batch 3: Recurring Bookings
+    is_recurring      = Column(Boolean, default=False)
+    frequency         = Column(String(20), nullable=True) # once, weekly, monthly
+    parent_booking_id = Column(UUID(as_uuid=True), nullable=True)
+
     # Rescheduling
     reschedule_proposed_at = Column(DateTime, nullable=True)
     reschedule_reason      = Column(Text, nullable=True)

@@ -15,6 +15,9 @@ class BookingCreate(BaseModel):
     latitude: Optional[str] = None
     longitude: Optional[str] = None
 
+    is_recurring: bool = False
+    frequency: Optional[str] = "once"
+
 
 class BookingOut(BaseModel):
     id: UUID
@@ -37,6 +40,9 @@ class BookingOut(BaseModel):
     is_disputed: bool = False
     dispute_reason: str | None = None
     dispute_status: str | None = None
+
+    is_recurring: bool = False
+    frequency: str | None = None
 
     class Config:
         from_attributes = True
