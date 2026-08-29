@@ -29,6 +29,8 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_number VARCHAR"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS id_photo_url VARCHAR"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS identity_status VARCHAR DEFAULT 'unverified'"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS average_customer_rating INTEGER"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_reviews_count INTEGER DEFAULT 0"))
         db.commit()
 
         # Columns for 'providers'
@@ -38,6 +40,20 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS open_hours VARCHAR"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS is_online BOOLEAN DEFAULT TRUE"))
         db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS service_radius INTEGER DEFAULT 10"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS background_checked BOOLEAN DEFAULT FALSE"))
+        db.execute(text("ALTER TABLE providers ADD COLUMN IF NOT EXISTS verification_tier VARCHAR DEFAULT 'standard'"))
+        db.commit()
+
+        # Columns for 'bookings'
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_proposed_at TIMESTAMP"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_reason TEXT"))
+        db.execute(text("ALTER TABLE bookings ADD COLUMN IF NOT EXISTS reschedule_by UUID"))
+        db.commit()
+
+        # Columns for 'reviews'
+        db.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS booking_id UUID UNIQUE REFERENCES bookings(id) ON DELETE CASCADE"))
+        db.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS provider_response TEXT"))
+        db.execute(text("ALTER TABLE reviews ADD COLUMN IF NOT EXISTS responded_at TIMESTAMP"))
         db.commit()
 
         # Ensure Enum values exist in PostgreSQL (BookingStatus)
@@ -46,7 +62,7 @@ def fix_missing_columns():
         try:
             with engine.connect() as conn:
                 with conn.execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
-                    for value in ['in-progress', 'paid', 'cancelled']:
+                    for value in ['in-progress', 'paid', 'cancelled', 'rescheduled']:
                         try:
                             autocommit_conn.execute(text(f"ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS '{value}'"))
                         except Exception as e:
