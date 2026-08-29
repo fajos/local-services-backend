@@ -112,3 +112,15 @@ def deactivate_my_account(
 ):
     current_user.is_active = False
     db.commit()
+
+@router.patch("/me/fcm-token", status_code=204)
+def update_fcm_token(
+    payload: dict,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    token = payload.get("token")
+    if not token:
+        raise HTTPException(400, "Token is required")
+    current_user.fcm_token = token
+    db.commit()

@@ -49,6 +49,7 @@ class User(Base):
     # Batch 4: Referrals
     referral_code  = Column(String(50), unique=True, index=True, nullable=True)
     referred_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    fcm_token      = Column(String, nullable=True)
 
     # Reputation
     average_customer_rating = Column(Integer, nullable=True) # store as hundredths

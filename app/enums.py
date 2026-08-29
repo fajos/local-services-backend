@@ -13,6 +13,7 @@ class BookingStatus(str, Enum):
     pending = "pending"
     accepted = "accepted"
     declined = "declined"
+    en_route = "en_route"
     in_progress = "in-progress"
     completed = "completed"
     paid = "paid"

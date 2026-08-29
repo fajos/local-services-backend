@@ -33,6 +33,7 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_reviews_count INTEGER DEFAULT 0"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50) UNIQUE"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_id UUID REFERENCES users(id)"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS fcm_token VARCHAR"))
         db.commit()
 
         # Columns for 'providers'
@@ -73,7 +74,7 @@ def fix_missing_columns():
         try:
             with engine.connect() as conn:
                 with conn.execution_options(isolation_level="AUTOCOMMIT") as autocommit_conn:
-                    for value in ['in-progress', 'paid', 'cancelled', 'rescheduled']:
+                    for value in ['in-progress', 'paid', 'cancelled', 'rescheduled', 'en_route']:
                         try:
                             autocommit_conn.execute(text(f"ALTER TYPE bookingstatus ADD VALUE IF NOT EXISTS '{value}'"))
                         except Exception as e:

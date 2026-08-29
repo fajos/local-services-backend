@@ -235,6 +235,37 @@ def get_bookings_for_provider(
 
     return result                      # ← ALWAYS a list
 
+@router.post("/{booking_id}/mark-en-route", response_model=BookingOut)
+def provider_mark_en_route(
+    booking_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    booking = db.query(Booking).filter(Booking.id == booking_id).first()
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    if booking.service.provider.user_id != current_user.id:
+        raise HTTPException(403, "Not your booking")
+
+    if booking.booking_status != BookingStatus.accepted:
+        raise HTTPException(400, "Booking must be accepted before going en route")
+
+    booking.booking_status = BookingStatus.en_route
+    db.commit()
+    db.refresh(booking)
+
+    # Notify Customer
+    create_notification(
+        db,
+        booking.customer_id,
+        "Provider is en route! 🚚",
+        f"Great news! Your provider for '{booking.service.name}' has started driving to your location. You can now track them on the map.",
+        "info"
+    )
+
+    return booking
+
 @router.post("/{booking_id}/mark-in-progress", response_model=BookingOut)
 def provider_mark_in_progress(
     booking_id: str,
