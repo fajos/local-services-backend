@@ -46,10 +46,11 @@ class User(Base):
     is_admin = Column(Boolean, default=False)
     is_super_admin = Column(Boolean, default=False)
 
-    # Batch 4: Referrals
-    referral_code  = Column(String(50), unique=True, index=True, nullable=True)
-    referred_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
-    fcm_token      = Column(String, nullable=True)
+    # Batch 4: Referrals & Rewards
+    referral_code   = Column(String(50), unique=True, index=True, nullable=True)
+    referred_by_id  = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    wallet_balance  = Column(Integer, default=0) # amount in Kobo/Cents or Naira
+    fcm_token       = Column(String, nullable=True)
 
     # Reputation
     average_customer_rating = Column(Integer, nullable=True) # store as hundredths

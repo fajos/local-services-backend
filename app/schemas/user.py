@@ -74,3 +74,6 @@ class UserOutExtended(UserOut):
     is_super_admin: bool | None = False
     is_verified_provider: Optional[bool] = False
     provider_id: Optional[UUID] = None
+    wallet_balance: Optional[int] = 0
+    booking_count: Optional[int] = 0
+    review_count: Optional[int] = 0

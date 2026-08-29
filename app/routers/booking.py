@@ -73,62 +73,6 @@ def book_service(
 
     return booking
 
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
-
 @router.get("/me", response_model=List[BookingCustomerOut])
 def get_my_bookings(
     db: Session = Depends(get_db),
@@ -140,6 +84,7 @@ def get_my_bookings(
         .join(Provider, Service.provider_id == Provider.id)
         .join(User, Provider.user_id == User.id)
         .filter(Booking.customer_id == current_user.id)
+        .order_by(Booking.created_at.desc())
         .all()
     )
 
@@ -157,8 +102,11 @@ def get_my_bookings(
             "payment_status": b.payment_status,
             "created_at": b.created_at,
             "service_name": b.service.name,
-            "service_category": b.service.category,          # 👈
+            "service_category": b.service.category,
             "provider_name": f"{b.service.provider.user.first_name} {b.service.provider.user.last_name}",
+            "provider_business_name": b.service.provider.business_name,
+            "is_disputed": b.is_disputed,
+            "has_review": db.query(Review).filter(Review.booking_id == b.id).first() is not None
         }
         for b in bookings
     ]
@@ -168,17 +116,14 @@ def get_bookings_for_provider(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    # 1. robust provider lookup
     provider = (
         db.query(Provider)
         .filter(Provider.user_id == current_user.id)
         .first()
     )
     if not provider:
-        # still raise 404 – caller gets proper error, not None
         raise HTTPException(404, "You are not registered as a provider.")
 
-    # 2. collect service IDs (can be empty)
     service_ids = (
         db.query(Service.id)
         .filter(Service.provider_id == provider.id)
@@ -186,19 +131,18 @@ def get_bookings_for_provider(
     )
     service_ids = [row.id for row in service_ids]
 
-    if not service_ids:                # ← no services yet
-        return []                      #   return empty list, not None
+    if not service_ids:
+        return []
 
-    # 3. fetch bookings
     bookings = (
         db.query(Booking)
         .join(Service, Booking.service_id == Service.id)
         .join(User, Booking.customer_id == User.id)
         .filter(Booking.service_id.in_(service_ids))
+        .order_by(Booking.created_at.desc())
         .all()
     )
 
-    # 4. build list (may still be empty, but never None!)
     result = []
     for b in bookings:
         contact = (
@@ -230,10 +174,11 @@ def get_bookings_for_provider(
                 "provider_name": provider.business_name,
                 "admin_released": b.admin_released,
                 "customer_info": contact,
+                "has_customer_review": db.query(CustomerReview).filter(CustomerReview.booking_id == b.id).first() is not None
             }
         )
 
-    return result                      # ← ALWAYS a list
+    return result
 
 @router.post("/{booking_id}/mark-en-route", response_model=BookingOut)
 def provider_mark_en_route(
@@ -255,12 +200,11 @@ def provider_mark_en_route(
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
         "Provider is en route! 🚚",
-        f"Great news! Your provider for '{booking.service.name}' has started driving to your location. You can now track them on the map.",
+        f"Great news! Your provider for '{booking.service.name}' has started driving to your location.",
         "info"
     )
 
@@ -279,14 +223,14 @@ def provider_mark_in_progress(
     if booking.service.provider.user_id != current_user.id:
         raise HTTPException(403, "Not your booking")
 
-    if booking.booking_status != BookingStatus.accepted:
-        raise HTTPException(400, "Booking must be accepted before starting")
+    # Status can move from accepted or en_route
+    if booking.booking_status not in [BookingStatus.accepted, BookingStatus.en_route, BookingStatus.rescheduled]:
+        raise HTTPException(400, "Booking status invalid for starting job")
 
     booking.booking_status = BookingStatus.in_progress
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
@@ -296,62 +240,6 @@ def provider_mark_in_progress(
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/mark-complete", response_model=BookingOut)
 def provider_mark_complete(
@@ -373,7 +261,6 @@ def provider_mark_complete(
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
@@ -383,62 +270,6 @@ def provider_mark_complete(
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.patch("/{booking_id}/cancel", response_model=BookingCustomerOut)
 def cancel_booking(
@@ -461,7 +292,6 @@ def cancel_booking(
     db.commit()
     db.refresh(booking)
 
-    # Notify Provider
     create_notification(
         db,
         booking.service.provider.user_id,
@@ -470,7 +300,6 @@ def cancel_booking(
         "warning"
     )
 
-    # Re-use the enrich logic (brevity):
     service   = booking.service
     provider  = service.provider.user
     return {
@@ -489,96 +318,28 @@ def send_quote(
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Booking not found."
-        )
+        raise HTTPException(404, "Booking not found.")
 
     if booking.quote_status != QuoteStatus.pending:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Quote already sent or accepted."
-        )
+        raise HTTPException(400, "Quote already processed.")
 
-    # Only provider who owns service can send quote
     if booking.service.provider.user_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not allowed to quote on this booking."
-        )
+        raise HTTPException(403, "Not authorized.")
 
     booking.quote_price = quote_price
     booking.quote_status = QuoteStatus.pending
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
         "New Quote Received 💰",
-        f"You received a quote of ₦{quote_price:,} for '{booking.service.name}'. Check your dashboard to accept or decline.",
+        f"You received a quote of ₦{quote_price:,} for '{booking.service.name}'.",
         "info"
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
-
 
 @router.post("/{booking_id}/accept-quote", response_model=BookingOut)
 def accept_quote(
@@ -588,93 +349,27 @@ def accept_quote(
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Booking not found."
-        )
+        raise HTTPException(404, "Booking not found.")
 
     if booking.customer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not allowed to accept this quote."
-        )
+        raise HTTPException(403, "Not authorized.")
 
     if booking.quote_status != QuoteStatus.pending:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No pending quote to accept."
-        )
+        raise HTTPException(400, "No pending quote to accept.")
 
     booking.quote_status = QuoteStatus.accepted
     db.commit()
     db.refresh(booking)
 
-    # Notify Provider
     create_notification(
         db,
         booking.service.provider.user_id,
         "Quote Accepted ✅",
-        f"{current_user.first_name} accepted your quote for '{booking.service.name}'. You can now proceed with the service.",
+        f"{current_user.first_name} accepted your quote for '{booking.service.name}'.",
         "success"
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/decline-quote", response_model=BookingOut)
 def decline_quote(
@@ -684,28 +379,18 @@ def decline_quote(
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Booking not found."
-        )
+        raise HTTPException(404, "Booking not found.")
 
     if booking.customer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not allowed to decline this quote."
-        )
+        raise HTTPException(403, "Not authorized.")
 
     if booking.quote_status != QuoteStatus.pending:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="No pending quote to decline."
-        )
+        raise HTTPException(400, "No pending quote to decline.")
 
     booking.quote_status = QuoteStatus.declined
     db.commit()
     db.refresh(booking)
 
-    # Notify Provider
     create_notification(
         db,
         booking.service.provider.user_id,
@@ -716,62 +401,6 @@ def decline_quote(
 
     return booking
 
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
-
 @router.post("/{booking_id}/mark-paid", response_model=BookingOut)
 def mark_booking_paid(
     booking_id: str,
@@ -780,95 +409,60 @@ def mark_booking_paid(
 ):
     booking = db.query(Booking).filter(Booking.id == booking_id).first()
     if not booking:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Booking not found."
-        )
+        raise HTTPException(404, "Booking not found.")
 
     if booking.customer_id != current_user.id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You are not allowed to pay for this booking."
-        )
+        raise HTTPException(403, "Not authorized.")
 
     if booking.payment_status != PaymentStatus.unpaid:
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Booking already paid."
-        )
+        raise HTTPException(400, "Booking already paid.")
 
     booking.payment_status = PaymentStatus.paid
+
+    # -------------------------------------------------------------
+    # Referral Reward Logic
+    # -------------------------------------------------------------
+    if current_user.referred_by_id:
+        paid_count = db.query(Booking).filter(
+            Booking.customer_id == current_user.id,
+            Booking.payment_status == PaymentStatus.paid,
+            Booking.id != booking.id
+        ).count()
+
+        if paid_count == 0:
+            reward_amount = 500
+            referrer = db.query(User).filter(User.id == current_user.referred_by_id).first()
+            if referrer:
+                referrer.wallet_balance = (referrer.wallet_balance or 0) + reward_amount
+                create_notification(
+                    db, referrer.id,
+                    "Referral Reward! 💰",
+                    f"You earned ₦{reward_amount} because {current_user.first_name} completed their first booking.",
+                    "success"
+                )
+
+                current_user.wallet_balance = (current_user.wallet_balance or 0) + reward_amount
+                create_notification(
+                    db, current_user.id,
+                    "Welcome Bonus! 🎁",
+                    f"You earned ₦{reward_amount} as a welcome bonus for your first booking.",
+                    "success"
+                )
+    # -------------------------------------------------------------
+
     db.commit()
     db.refresh(booking)
 
-    # Notify Provider
     create_notification(
         db,
         booking.service.provider.user_id,
         "Payment Received 💵",
-        f"{current_user.first_name} has paid for '{booking.service.name}'. You can now see their contact details in your dashboard.",
+        f"{current_user.first_name} has paid for '{booking.service.name}'.",
         "success"
     )
 
     return booking
 
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
-
-# Provider ACCEPTS a booking (e.g., fixed-price job)
 @router.post("/{booking_id}/accept-booking", response_model=BookingOut)
 def provider_accept_booking(
     booking_id: str,
@@ -879,9 +473,8 @@ def provider_accept_booking(
     if not booking:
         raise HTTPException(404, "Booking not found")
 
-    # Only the provider who owns the service can accept
     if booking.service.provider.user_id != current_user.id:
-        raise HTTPException(403, "Not your booking")
+        raise HTTPException(403, "Not authorized")
 
     if booking.booking_status != BookingStatus.pending:
         raise HTTPException(400, "Booking already processed")
@@ -890,72 +483,15 @@ def provider_accept_booking(
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
         "Booking Accepted ✅",
-        f"Your booking for '{booking.service.name}' has been accepted by the provider.",
+        f"Your booking for '{booking.service.name}' has been accepted.",
         "success"
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/review", response_model=ReviewOut, status_code=201)
 def add_booking_review(
@@ -964,7 +500,6 @@ def add_booking_review(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Alias for adding a review via booking ID (Mobile compat)"""
     booking = db.query(Booking).filter(
         Booking.id == booking_id,
         Booking.customer_id == current_user.id,
@@ -989,7 +524,6 @@ def add_booking_review(
     db.commit()
     db.refresh(review)
 
-    # Update provider average
     prov = booking.service.provider
     avg = db.query(func.avg(Review.rating)).filter(Review.provider_id == prov.id).scalar() or 0
     prov.average_rating = int(round(avg * 100))
@@ -1014,13 +548,13 @@ def rate_customer(
         raise HTTPException(404, "Booking not found")
 
     if booking.service.provider.user_id != current_user.id:
-        raise HTTPException(403, "Not authorized to rate this customer")
+        raise HTTPException(403, "Not authorized")
 
     if booking.booking_status != BookingStatus.completed:
         raise HTTPException(400, "Can only rate customer after completion")
 
     if db.query(CustomerReview).filter(CustomerReview.booking_id == booking.id).first():
-        raise HTTPException(400, "Already rated this customer for this booking")
+        raise HTTPException(400, "Already rated")
 
     review = CustomerReview(
         booking_id=booking.id,
@@ -1033,7 +567,6 @@ def rate_customer(
     db.commit()
     db.refresh(review)
 
-    # Update customer average rating
     customer = booking.customer
     avg = db.query(func.avg(CustomerReview.rating)).filter(CustomerReview.customer_id == customer.id).scalar() or 0
     customer.average_customer_rating = int(round(avg * 100))
@@ -1056,7 +589,6 @@ def propose_reschedule(
     if not booking:
         raise HTTPException(404, "Booking not found")
 
-    # Both customer and provider can propose
     is_customer = booking.customer_id == current_user.id
     is_provider = booking.service.provider.user_id == current_user.id
 
@@ -1071,73 +603,16 @@ def propose_reschedule(
     db.commit()
     db.refresh(booking)
 
-    # Notify other party
     other_party_id = booking.service.provider.user_id if is_customer else booking.customer_id
     create_notification(
         db,
         other_party_id,
         "Reschedule Proposed 🕒",
-        f"{current_user.first_name} proposed a new time for '{booking.service.name}': {payload.new_date.strftime('%Y-%m-%d %H:%M')}.",
+        f"{current_user.first_name} proposed a new time for '{booking.service.name}'.",
         "warning"
     )
 
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/dispute", response_model=BookingOut)
 def report_booking_dispute(
@@ -1151,7 +626,7 @@ def report_booking_dispute(
         raise HTTPException(404, "Booking not found")
 
     if booking.customer_id != current_user.id:
-        raise HTTPException(403, "Only the customer can report an issue")
+        raise HTTPException(403, "Only customers can report issues")
 
     booking.is_disputed = True
     booking.dispute_reason = payload.get("reason")
@@ -1166,57 +641,31 @@ def report_booking_dispute(
 def send_booking_reminders(
     db: Session = Depends(get_db)
 ):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
     now = datetime.utcnow()
-
-    # 1. 24-hour reminders
+    # 24h
     target_24h = now + timedelta(hours=24)
     bookings_24h = db.query(Booking).filter(
         Booking.scheduled_at >= target_24h - timedelta(minutes=30),
         Booking.scheduled_at <= target_24h + timedelta(minutes=30),
         Booking.booking_status == BookingStatus.accepted
     ).all()
-
     for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
+        create_notification(db, b.customer_id, "Reminder: 24h to go! ⏰", f"Your booking for '{b.service.name}' is tomorrow.", "info")
+        create_notification(db, b.service.provider.user_id, "Upcoming Job Tomorrow 🗓️", f"Job '{b.service.name}' is scheduled for tomorrow.", "info")
 
-    # 2. 1-hour reminders
+    # 1h
     target_1h = now + timedelta(hours=1)
     bookings_1h = db.query(Booking).filter(
         Booking.scheduled_at >= target_1h - timedelta(minutes=15),
         Booking.scheduled_at <= target_1h + timedelta(minutes=15),
         Booking.booking_status == BookingStatus.accepted
     ).all()
-
     for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
+        create_notification(db, b.customer_id, "Reminder: 1 hour left! ⏳", f"Provider for '{b.service.name}' in 1 hour.", "warning")
+        create_notification(db, b.service.provider.user_id, "Job starts in 1 hour! 🚀", f"'{b.service.name}' starts in 1 hour.", "warning")
 
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+    return {"message": "Reminders sent"}
+
 @router.post("/{booking_id}/decline-booking", response_model=BookingOut)
 def provider_decline_booking(
     booking_id: str,
@@ -1228,78 +677,17 @@ def provider_decline_booking(
         raise HTTPException(404, "Booking not found")
 
     if booking.service.provider.user_id != current_user.id:
-        raise HTTPException(403, "Not your booking")
-
-    if booking.booking_status != BookingStatus.pending:
-        raise HTTPException(400, "Booking already processed")
+        raise HTTPException(403, "Not authorized")
 
     booking.booking_status = BookingStatus.declined
     db.commit()
     db.refresh(booking)
 
-    # Notify Customer
     create_notification(
         db,
         booking.customer_id,
         "Booking Declined ❌",
-        f"The provider has declined your booking request for '{booking.service.name}'.",
+        f"The provider declined your request for '{booking.service.name}'.",
         "danger"
     )
     return booking
-
-@router.post("/cron/reminders")
-def send_booking_reminders(
-    db: Session = Depends(get_db)
-):
-    """
-    Cron endpoint to send 24h and 1h reminders.
-    In production, call this via a Cron Job every 30-60 mins.
-    """
-    now = datetime.utcnow()
-
-    # 1. 24-hour reminders
-    target_24h = now + timedelta(hours=24)
-    bookings_24h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
-        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_24h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 24h to go! ⏰",
-            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
-            "info"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Upcoming Job Tomorrow 🗓️",
-            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
-            "info"
-        )
-
-    # 2. 1-hour reminders
-    target_1h = now + timedelta(hours=1)
-    bookings_1h = db.query(Booking).filter(
-        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
-        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
-        Booking.booking_status == BookingStatus.accepted
-    ).all()
-
-    for b in bookings_1h:
-        create_notification(
-            db, b.customer_id,
-            "Reminder: 1 hour left! ⏳",
-            f"The provider for '{b.service.name}' is expected in 1 hour.",
-            "warning"
-        )
-        create_notification(
-            db, b.service.provider.user_id,
-            "Job starts in 1 hour! 🚀",
-            f"Get ready! '{b.service.name}' starts in 1 hour.",
-            "warning"
-        )
-
-    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
-

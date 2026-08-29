@@ -55,14 +55,17 @@ class BookingOutExtended(BookingOut):
     service_name: str
     service_category: str
     customer_name: str
-    admin_released: bool = False   # default ⇒ no validation erro
+    admin_released: bool = False
     customer_info: Optional[CustomerContact] = None
     provider_name: str 
+    has_customer_review: bool = False
 
 class BookingCustomerOut(BookingOut):
     service_name: str
-    service_category: str       # NEW
+    service_category: str
     provider_name: str
+    provider_business_name: str | None = None
+    has_review: bool = False
 
 class RescheduleRequest(BaseModel):
     new_date: datetime

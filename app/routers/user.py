@@ -11,6 +11,9 @@ import uuid
 from app.models.provider import Provider
 from app.schemas.user import UserOutExtended, UserUpdate, ChangePasswordRequest
 
+from app.models.booking import Booking
+from app.models.review import Review
+
 router = APIRouter(prefix="/users", tags=["Users"])
 
 
@@ -45,7 +48,17 @@ def get_my_profile(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # Auto-generate referral code if missing
+    if not current_user.referral_code:
+        current_user.referral_code = f"LSF-{uuid.uuid4().hex[:8].upper()}"
+        db.commit()
+
     provider = db.query(Provider).filter(Provider.user_id == current_user.id).first()
+
+    # Stats
+    booking_count = db.query(Booking).filter(Booking.customer_id == current_user.id).count()
+    review_count = db.query(Review).filter(Review.customer_id == current_user.id).count()
+
     return {
         "id": current_user.id,
         "first_name": current_user.first_name,
@@ -66,7 +79,11 @@ def get_my_profile(
         "is_admin": current_user.is_admin,
         "is_super_admin": current_user.is_super_admin,
         "is_verified_provider": provider.verified if provider else False,
-        "provider_id": provider.id if provider else None
+        "provider_id": provider.id if provider else None,
+        "referral_code": current_user.referral_code,
+        "wallet_balance": current_user.wallet_balance,
+        "booking_count": booking_count,
+        "review_count": review_count
     }
 
 @router.put("/me", response_model=UserOut)
