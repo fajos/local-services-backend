@@ -18,6 +18,7 @@ from app.core.security import (
 )
 from datetime import datetime, timedelta
 from pydantic import BaseModel
+import uuid
 
 import asyncio
 
@@ -152,6 +153,14 @@ def register(
         raise HTTPException(400, "Phone number already in use.")
 
     # 3) create user
+    ref_code = f"LSF-{uuid.uuid4().hex[:8].upper()}"
+
+    referred_by_id = None
+    if data.referral_code:
+        referrer = db.query(User).filter(User.referral_code == data.referral_code.upper()).first()
+        if referrer:
+            referred_by_id = referrer.id
+
     user = User(
         first_name=data.first_name,
         last_name=data.last_name,
@@ -160,7 +169,9 @@ def register(
         password_hash=hash_password(data.password),
         is_active=True,
         address=data.address,
-        is_phone_confirmed=True # Auto-confirm phone since we aren't verifying it
+        is_phone_confirmed=True, # Auto-confirm phone since we aren't verifying it
+        referral_code=ref_code,
+        referred_by_id=referred_by_id
     )
 
     db.add(user)

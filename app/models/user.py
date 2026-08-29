@@ -41,9 +41,14 @@ class User(Base):
 
     # One-to-many with Notifications
     notifications = relationship("Notification", back_populates="user", cascade="all, delete-orphan")
+    favorite_providers = relationship("FavoriteProvider", back_populates="user", cascade="all, delete-orphan")
 
     is_admin = Column(Boolean, default=False)
     is_super_admin = Column(Boolean, default=False)
+
+    # Batch 4: Referrals
+    referral_code  = Column(String(50), unique=True, index=True, nullable=True)
+    referred_by_id = Column(UUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
 
     # Reputation
     average_customer_rating = Column(Integer, nullable=True) # store as hundredths

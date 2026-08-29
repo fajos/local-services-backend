@@ -49,6 +49,7 @@ class UserOut(BaseModel):
     is_phone_confirmed: bool | None = False
     is_provider: bool | None = False
     is_active: bool | None = True
+    referral_code: str | None = None
     created_at: datetime
 
     class Config:

@@ -31,6 +31,8 @@ def fix_missing_columns():
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS identity_status VARCHAR DEFAULT 'unverified'"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS average_customer_rating INTEGER"))
         db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS customer_reviews_count INTEGER DEFAULT 0"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS referral_code VARCHAR(50) UNIQUE"))
+        db.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS referred_by_id UUID REFERENCES users(id)"))
         db.commit()
 
         # Columns for 'providers'
@@ -106,6 +108,14 @@ def fix_missing_columns():
                 provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
                 title VARCHAR,
                 image_url VARCHAR NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        """))
+        db.execute(text("""
+            CREATE TABLE IF NOT EXISTS favorite_providers (
+                id UUID PRIMARY KEY,
+                user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                provider_id UUID NOT NULL REFERENCES providers(id) ON DELETE CASCADE,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
         """))

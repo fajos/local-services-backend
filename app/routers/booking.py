@@ -14,7 +14,7 @@ from app.dependencies import get_db
 from app.dependencies import get_current_user, get_current_admin
 from app.utils.notifications import create_notification
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 router = APIRouter(prefix="/bookings", tags=["Bookings"])
 
@@ -72,6 +72,62 @@ def book_service(
     )
 
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.get("/me", response_model=List[BookingCustomerOut])
 def get_my_bookings(
@@ -210,6 +266,62 @@ def provider_mark_in_progress(
 
     return booking
 
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+
 @router.post("/{booking_id}/mark-complete", response_model=BookingOut)
 def provider_mark_complete(
     booking_id: str,
@@ -240,6 +352,62 @@ def provider_mark_complete(
     )
 
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.patch("/{booking_id}/cancel", response_model=BookingCustomerOut)
 def cancel_booking(
@@ -324,6 +492,62 @@ def send_quote(
 
     return booking
 
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+
 
 @router.post("/{booking_id}/accept-quote", response_model=BookingOut)
 def accept_quote(
@@ -365,6 +589,62 @@ def accept_quote(
 
     return booking
 
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+
 @router.post("/{booking_id}/decline-quote", response_model=BookingOut)
 def decline_quote(
     booking_id: str,
@@ -404,6 +684,62 @@ def decline_quote(
     )
 
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/mark-paid", response_model=BookingOut)
 def mark_booking_paid(
@@ -445,6 +781,62 @@ def mark_booking_paid(
 
     return booking
 
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+
 # Provider ACCEPTS a booking (e.g., fixed-price job)
 @router.post("/{booking_id}/accept-booking", response_model=BookingOut)
 def provider_accept_booking(
@@ -477,6 +869,62 @@ def provider_accept_booking(
     )
 
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 
 @router.post("/{booking_id}/review", response_model=ReviewOut, status_code=201)
 def add_booking_review(
@@ -604,6 +1052,62 @@ def propose_reschedule(
 
     return booking
 
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
+
 @router.post("/{booking_id}/dispute", response_model=BookingOut)
 def report_booking_dispute(
     booking_id: uuid.UUID,
@@ -626,6 +1130,62 @@ def report_booking_dispute(
     db.refresh(booking)
 
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 @router.post("/{booking_id}/decline-booking", response_model=BookingOut)
 def provider_decline_booking(
     booking_id: str,
@@ -655,4 +1215,60 @@ def provider_decline_booking(
         "danger"
     )
     return booking
+
+@router.post("/cron/reminders")
+def send_booking_reminders(
+    db: Session = Depends(get_db)
+):
+    """
+    Cron endpoint to send 24h and 1h reminders.
+    In production, call this via a Cron Job every 30-60 mins.
+    """
+    now = datetime.utcnow()
+
+    # 1. 24-hour reminders
+    target_24h = now + timedelta(hours=24)
+    bookings_24h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_24h - timedelta(minutes=30),
+        Booking.scheduled_at <= target_24h + timedelta(minutes=30),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_24h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 24h to go! ⏰",
+            f"Your booking for '{b.service.name}' is scheduled for tomorrow at {b.scheduled_at.strftime('%H:%M')}.",
+            "info"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Upcoming Job Tomorrow 🗓️",
+            f"Reminder: You have a job '{b.service.name}' scheduled for tomorrow.",
+            "info"
+        )
+
+    # 2. 1-hour reminders
+    target_1h = now + timedelta(hours=1)
+    bookings_1h = db.query(Booking).filter(
+        Booking.scheduled_at >= target_1h - timedelta(minutes=15),
+        Booking.scheduled_at <= target_1h + timedelta(minutes=15),
+        Booking.booking_status == BookingStatus.accepted
+    ).all()
+
+    for b in bookings_1h:
+        create_notification(
+            db, b.customer_id,
+            "Reminder: 1 hour left! ⏳",
+            f"The provider for '{b.service.name}' is expected in 1 hour.",
+            "warning"
+        )
+        create_notification(
+            db, b.service.provider.user_id,
+            "Job starts in 1 hour! 🚀",
+            f"Get ready! '{b.service.name}' starts in 1 hour.",
+            "warning"
+        )
+
+    return {"message": "Reminders sent", "count_24h": len(bookings_24h), "count_1h": len(bookings_1h)}
 

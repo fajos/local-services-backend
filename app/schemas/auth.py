@@ -19,6 +19,7 @@ class RegisterRequest(BaseModel):
     phone:      Optional[str]       = Field(None, min_length=10, max_length=20)
     password:   str = Field(..., min_length=8)
     address:    str
+    referral_code: Optional[str] = None
 
 class ConfirmEmailRequest(BaseModel):
     token: str

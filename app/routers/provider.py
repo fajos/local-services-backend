@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.schemas.provider import ProviderCreate, ProviderOut, ProviderUpdate
 from app.models.provider import Provider
 from app.models.portfolio import PortfolioItem
+from app.models.favorite import FavoriteProvider
 from app.schemas.portfolio import PortfolioItemCreate, PortfolioItemOut
 from app.models.user import User
 from app.dependencies import get_db
@@ -166,3 +167,54 @@ def remove_from_portfolio(
     db.delete(item)
     db.commit()
     return None
+
+# --- Favorites Endpoints ---
+
+@router.post("/{provider_id}/favorite", status_code=204)
+def favorite_provider(
+    provider_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # Check if provider exists
+    provider = db.query(Provider).filter(Provider.id == provider_id).first()
+    if not provider:
+        raise HTTPException(404, "Provider not found")
+
+    # Check if already favorited
+    existing = db.query(FavoriteProvider).filter(
+        FavoriteProvider.user_id == current_user.id,
+        FavoriteProvider.provider_id == provider_id
+    ).first()
+
+    if not existing:
+        fav = FavoriteProvider(user_id=current_user.id, provider_id=provider_id)
+        db.add(fav)
+        db.commit()
+    return None
+
+@router.delete("/{provider_id}/favorite", status_code=204)
+def unfavorite_provider(
+    provider_id: uuid.UUID,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    fav = db.query(FavoriteProvider).filter(
+        FavoriteProvider.user_id == current_user.id,
+        FavoriteProvider.provider_id == provider_id
+    ).first()
+
+    if fav:
+        db.delete(fav)
+        db.commit()
+    return None
+
+@router.get("/favorites/me", response_model=list[ProviderOut])
+def get_my_favorites(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    favs = db.query(Provider).join(
+        FavoriteProvider, Provider.id == FavoriteProvider.provider_id
+    ).filter(FavoriteProvider.user_id == current_user.id).all()
+    return favs

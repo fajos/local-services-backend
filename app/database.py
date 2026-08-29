@@ -19,4 +19,4 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 
 Base = declarative_base()
 
-from app.models import user, provider, service, booking, review, portfolio
+from app.models import user, provider, service, booking, review, portfolio, favorite
