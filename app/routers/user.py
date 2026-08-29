@@ -4,12 +4,12 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.schemas.user import UserCreate, UserOut
 from app.models.user import User
-from app.core.security import hash_password
+from app.core.security import hash_password, verify_password
 from app.dependencies import get_db
 from app.dependencies import get_current_user
 import uuid
 from app.models.provider import Provider
-from app.schemas.user import UserOutExtended, UserUpdate
+from app.schemas.user import UserOutExtended, UserUpdate, ChangePasswordRequest
 
 router = APIRouter(prefix="/users", tags=["Users"])
 
@@ -83,13 +83,27 @@ def update_my_profile(
             current_user.identity_status = "pending"
 
     for field, value in data.items():
-        if field == "password":
-            current_user.password_hash = hash_password(value)
-        else:
-            setattr(current_user, field, value)
+        setattr(current_user, field, value)
     db.commit()
     db.refresh(current_user)
     return current_user
+
+@router.post("/me/change-password", status_code=204)
+def change_my_password(
+    payload: ChangePasswordRequest,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    # 1. Verify current password
+    if not verify_password(payload.current_password, current_user.password_hash):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Current password is incorrect"
+        )
+
+    # 2. Update to new password
+    current_user.password_hash = hash_password(payload.new_password)
+    db.commit()
 
 @router.patch("/me/deactivate", status_code=204)
 def deactivate_my_account(

@@ -63,7 +63,10 @@ class UserUpdate(BaseModel):
     id_number:  str | None = None
     id_photo_url: str | None = None
     profile_photo_url: str | None = None
-    password:   str | None = Field(None, min_length=8)
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str
+    new_password: str = Field(..., min_length=8)
 
 class UserOutExtended(UserOut):
     is_admin: bool | None = False
